@@ -1,1920 +1,742 @@
+import { useState, useEffect, useCallback } from "react";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import {
-  LayoutDashboard, ChevronDown, ChevronRight, CheckCircle2, Circle,
-  BarChart3, Settings, BookOpen, Brain, Code2, Users, RefreshCw,
-  Trophy, Target, Flame, CalendarDays, Download, Upload, Trash2,
-  Clock, TrendingUp, AlertCircle, CheckCheck, Menu, X, FileText,
-  Zap, Shield, Database, GitBranch, Server, Cpu, Activity,
-  MessageSquare, Star, ArrowRight, Hash, Layers, Box, Play,
-  Coffee, Globe, Lock, Eye, RotateCcw, Award, ChevronUp
-} from "lucide-react";
-
-// ════════════════════════════════════════════════════════════
-// DESIGN TOKENS
-// ════════════════════════════════════════════════════════════
-
-const CAT_META = {
-  DSA:       { label:"DSA",      icon: Code2,       ring:"ring-blue-500/30",   bg:"bg-blue-950/40",  border:"border-blue-800/40",  text:"text-blue-300",   badge:"bg-blue-900/60 text-blue-300 border border-blue-700/40",   bar:"bg-blue-500"      },
-  HLD:       { label:"HLD",      icon: Brain,        ring:"ring-purple-500/30", bg:"bg-purple-950/40",border:"border-purple-800/40",text:"text-purple-300", badge:"bg-purple-900/60 text-purple-300 border border-purple-700/40",bar:"bg-purple-500"    },
-  LLD:       { label:"LLD",      icon: Layers,       ring:"ring-orange-500/30", bg:"bg-orange-950/40",border:"border-orange-800/40",text:"text-orange-300", badge:"bg-orange-900/60 text-orange-300 border border-orange-700/40",bar:"bg-orange-500"    },
-  Java:      { label:"Java",     icon: Coffee,       ring:"ring-cyan-500/30",   bg:"bg-cyan-950/40",  border:"border-cyan-800/40",  text:"text-cyan-300",   badge:"bg-cyan-900/60 text-cyan-300 border border-cyan-700/40",     bar:"bg-cyan-500"      },
-  Go:        { label:"Go",       icon: Zap,          ring:"ring-teal-500/30",   bg:"bg-teal-950/40",  border:"border-teal-800/40",  text:"text-teal-300",   badge:"bg-teal-900/60 text-teal-300 border border-teal-700/40",     bar:"bg-teal-500"      },
-  Backend:   { label:"Backend",  icon: Server,       ring:"ring-sky-500/30",    bg:"bg-sky-950/40",   border:"border-sky-800/40",   text:"text-sky-300",    badge:"bg-sky-900/60 text-sky-300 border border-sky-700/40",        bar:"bg-sky-500"       },
-  Behavioral:{ label:"Behavioral",icon:Users,        ring:"ring-yellow-500/30", bg:"bg-yellow-950/40",border:"border-yellow-800/40",text:"text-yellow-300", badge:"bg-yellow-900/60 text-yellow-300 border border-yellow-700/40",bar:"bg-yellow-500"   },
-  Revision:  { label:"Revision", icon: RotateCcw,    ring:"ring-green-500/30",  bg:"bg-green-950/40", border:"border-green-800/40", text:"text-green-300",  badge:"bg-green-900/60 text-green-300 border border-green-700/40",   bar:"bg-green-500"    },
-  Mock:      { label:"Mock",     icon: Award,        ring:"ring-pink-500/30",   bg:"bg-pink-950/40",  border:"border-pink-800/40",  text:"text-pink-300",   badge:"bg-pink-900/60 text-pink-300 border border-pink-700/40",     bar:"bg-pink-500"      },
+// ============================================================
+// THEME
+// ============================================================
+const T = {
+  bg:       "#0d0d14",
+  surface:  "#16161f",
+  card:     "#1c1c28",
+  border:   "#2a2a3a",
+  muted:    "#3a3a4e",
+  text:     "#e8e8f0",
+  textDim:  "#7070a0",
+  textFaint:"#404060",
+  indigo:   "#6366f1",
+  indigoDim:"rgba(99,102,241,0.15)",
+  amber:    "#f59e0b",
+  emerald:  "#10b981",
+  orange:   "#f97316",
+  cyan:     "#06b6d4",
+  rose:     "#f43f5e",
+  purple:   "#a855f7",
 };
 
-const PRIORITY_META = {
-  Critical: { text:"text-red-400",    dot:"bg-red-400"    },
-  High:     { text:"text-orange-400", dot:"bg-orange-400" },
-  Medium:   { text:"text-yellow-400", dot:"bg-yellow-400" },
-  Low:      { text:"text-slate-500",  dot:"bg-slate-500"  },
+const SUBJ = {
+  dsa:  { label:"DSA",  color:T.indigo,  bg:"rgba(99,102,241,0.12)",  textColor:"#a5b4fc" },
+  lld:  { label:"LLD",  color:T.amber,   bg:"rgba(245,158,11,0.12)",  textColor:"#fcd34d" },
+  hld:  { label:"HLD",  color:T.emerald, bg:"rgba(16,185,129,0.12)",  textColor:"#6ee7b7" },
+  java: { label:"Java", color:T.orange,  bg:"rgba(249,115,22,0.12)",  textColor:"#fdba74" },
+  go:   { label:"Go",   color:T.cyan,    bg:"rgba(6,182,212,0.12)",   textColor:"#67e8f9" },
 };
 
-// ════════════════════════════════════════════════════════════
-// DATE HELPERS
-// ════════════════════════════════════════════════════════════
+// ============================================================
+// STUDY PLAN DATA
+// ============================================================
+const START_DATE = new Date(2026, 5, 21);
+const END_DATE   = new Date(2026, 7, 31);
 
-const START = new Date(2026, 5, 17);
-const END   = new Date(2026, 7, 31);
+function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate()+n); return d; }
+function fmt(date)      { return date.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}); }
+function fmtS(date)     { return date.toLocaleDateString("en-IN",{day:"2-digit",month:"short"}); }
+function dayName(date)  { return date.toLocaleDateString("en-IN",{weekday:"long"}); }
+function isWknd(date)   { const d=date.getDay(); return d===0||d===6; }
 
-const addDays  = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-const fmtShort = d => d.toLocaleDateString("en-US", { month:"short", day:"numeric" });
-const fmtFull  = d => d.toLocaleDateString("en-US", { weekday:"long", month:"short", day:"numeric" });
-const fmtDay   = d => d.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
-const isoDate  = d => d.toISOString().split("T")[0];
-const TODAY    = new Date(); // or use new Date(2026,5,10) for demo
+const DSA_TOPICS = [
+  {topic:"Arrays & Hashing",     tasks:["Contains Duplicate – brute force & hash set","Valid Anagram – sort vs hash map","Two Sum – hash map O(n)"]},
+  {topic:"Arrays & Hashing",     tasks:["Group Anagrams – sorted key grouping","Top K Frequent – bucket sort","Product Except Self – prefix/suffix arrays"]},
+  {topic:"Arrays & Hashing",     tasks:["Encode & Decode Strings","Longest Consecutive Sequence – hash set O(n)","Arrays & Hashing review & mixed practice"]},
+  {topic:"Two Pointers",         tasks:["Valid Palindrome – two pointer","Two Sum II – sorted + left/right","3Sum – sort + two pointer, handle dupes"]},
+  {topic:"Two Pointers",         tasks:["Container With Most Water – greedy","Trapping Rain Water – O(n) two pointer","Two Pointers – pattern review & edge cases"]},
+  {topic:"Sliding Window",       tasks:["Best Time to Buy and Sell Stock","Longest Substring Without Repeating Chars","Longest Repeating Character Replacement"]},
+  {topic:"Sliding Window",       tasks:["Permutation in String – fixed window","Minimum Window Substring – variable window","Sliding Window – hard problem practice"]},
+  {topic:"Stack",                tasks:["Valid Parentheses – stack matching","Min Stack – two-stack trick","Evaluate Reverse Polish Notation"]},
+  {topic:"Stack",                tasks:["Daily Temperatures – monotonic stack","Car Fleet – stack simulation","Largest Rectangle in Histogram – mono stack O(n)"]},
+  {topic:"Binary Search",        tasks:["Binary Search – classic implementation","Search a 2D Matrix","Koko Eating Bananas – binary search on answer"]},
+  {topic:"Binary Search",        tasks:["Find Minimum in Rotated Sorted Array","Search in Rotated Sorted Array","Time Based Key-Value Store"]},
+  {topic:"Binary Search",        tasks:["Median of Two Sorted Arrays – hard","Binary Search – templates & edge cases","Binary Search – contest problem practice"]},
+  {topic:"Linked List",          tasks:["Reverse Linked List – iterative & recursive","Merge Two Sorted Lists – dummy node","Reorder List – find mid + reverse + merge"]},
+  {topic:"Linked List",          tasks:["Remove Nth Node From End – two pointer","Copy List with Random Pointer – hash map","Add Two Numbers – carry propagation"]},
+  {topic:"Linked List",          tasks:["Linked List Cycle – Floyd's","Find Duplicate Number – Floyd's in array","LRU Cache – doubly linked list + hash map"]},
+  {topic:"Trees",                tasks:["Invert Binary Tree – recursive & iterative","Maximum Depth – DFS/BFS","Diameter of Binary Tree – longest path"]},
+  {topic:"Trees",                tasks:["Balanced Binary Tree","Same Tree – structural comparison","Subtree of Another Tree"]},
+  {topic:"Trees",                tasks:["LCA – BST & general","Level Order Traversal – BFS queue","Binary Tree Right Side View"]},
+  {topic:"Trees",                tasks:["Count Good Nodes – DFS with max","Validate BST – range DFS","Kth Smallest in BST – inorder"]},
+  {topic:"Trees",                tasks:["Construct Tree from Preorder+Inorder","Binary Tree Maximum Path Sum","Serialize & Deserialize Binary Tree"]},
+  {topic:"Heap / Priority Queue",tasks:["Kth Largest in Stream – min-heap","Last Stone Weight – max-heap","K Closest Points to Origin"]},
+  {topic:"Heap / Priority Queue",tasks:["Kth Largest in Array – quickselect","Task Scheduler – frequency + greedy","Design Twitter – heap merge"]},
+  {topic:"Heap / Priority Queue",tasks:["Find Median from Data Stream – two heaps","Heap patterns – merge k sorted, top-k","Priority Queue in system design"]},
+  {topic:"Backtracking",         tasks:["Subsets – power set via backtracking","Combination Sum – unbounded picking","Permutations – swap-based DFS"]},
+  {topic:"Backtracking",         tasks:["Subsets II – deduplicate with sorting","Combination Sum II – skip duplicates","Word Search – 2D DFS with visited"]},
+  {topic:"Backtracking",         tasks:["Palindrome Partitioning","Letter Combinations of Phone Number","N-Queens – constraint-based placement"]},
+  {topic:"Tries",                tasks:["Implement Trie – insert/search/prefix","Design Add and Search Words – wildcard DFS","Word Search II – Trie + board DFS"]},
+  {topic:"Tries",                tasks:["Trie applications – autocomplete, IP routing","Compressed Trie / Radix Tree","Trie problems practice set"]},
+  {topic:"Graphs",               tasks:["Number of Islands – BFS/DFS flood fill","Clone Graph – BFS + hash map","Max Area of Island – DFS with area"]},
+  {topic:"Graphs",               tasks:["Pacific Atlantic Water Flow","Surrounded Regions – BFS from border","Rotting Oranges – multi-source BFS"]},
+  {topic:"Graphs",               tasks:["Course Schedule – cycle detection","Course Schedule II – topological sort","Graph Valid Tree – union find / DFS"]},
+  {topic:"Graphs",               tasks:["Number of Connected Components – UF","Redundant Connection – UF cycle detect","Word Ladder – BFS shortest path"]},
+  {topic:"Graphs",               tasks:["Alien Dictionary – topological sort","Cheapest Flights K Stops – Bellman-Ford","Graphs – pattern summary"]},
+  {topic:"Advanced Graphs",      tasks:["Dijkstra's Algorithm – SSSP","Bellman-Ford – negative weights","Floyd-Warshall – all-pairs"]},
+  {topic:"Advanced Graphs",      tasks:["Prim's & Kruskal's – MST","Network Delay Time – Dijkstra","Swim in Rising Water"]},
+  {topic:"Advanced Graphs",      tasks:["Critical Connections – Tarjan bridges","Min Cost to Connect All Points","Advanced graph review"]},
+  {topic:"Intervals",            tasks:["Insert Interval – merge on insert","Merge Intervals – sort + sweep","Non-Overlapping Intervals – greedy"]},
+  {topic:"Intervals",            tasks:["Meeting Rooms – feasibility","Meeting Rooms II – min rooms","Min Interval to Include Query"]},
+  {topic:"Greedy",               tasks:["Maximum Subarray – Kadane's","Jump Game – greedy reach","Jump Game II – BFS-style greedy"]},
+  {topic:"Greedy",               tasks:["Gas Station – circular greedy","Hand of Straights – grouping","Merge Triplets to Form Target"]},
+  {topic:"Greedy",               tasks:["Partition Labels","Valid Parenthesis String – greedy bounds","Greedy – pattern recognition review"]},
+  {topic:"Dynamic Programming 1",tasks:["Climbing Stairs – 1D DP","Min Cost Climbing Stairs","House Robber"]},
+  {topic:"Dynamic Programming 1",tasks:["House Robber II – circular","Longest Palindromic Substring","Palindromic Substrings – counting"]},
+  {topic:"Dynamic Programming 1",tasks:["Decode Ways – string parsing DP","Coin Change – bottom-up BFS","Maximum Product Subarray – track min/max"]},
+  {topic:"Dynamic Programming 1",tasks:["Word Break – segment DP + memo","Partition Equal Subset Sum – knapsack","Longest Increasing Subsequence"]},
+  {topic:"Dynamic Programming 2",tasks:["Unique Paths – 2D DP","Longest Common Subsequence","Best Time Buy+Sell with Cooldown"]},
+  {topic:"Dynamic Programming 2",tasks:["Coin Change II – counting combos","Target Sum – knapsack variant","Interleaving String – 2D DP"]},
+  {topic:"Dynamic Programming 2",tasks:["Longest Increasing Path in Matrix","Distinct Subsequences – counting 2D DP","Edit Distance – classic string DP"]},
+  {topic:"Dynamic Programming 2",tasks:["Burst Balloons – interval DP","Regular Expression Matching","DP patterns review – all categories"]},
+  {topic:"Bit Manipulation",     tasks:["Single Number – XOR trick","Number of 1 Bits","Counting Bits – DP with popcount"]},
+  {topic:"Bit Manipulation",     tasks:["Reverse Bits","Missing Number – XOR / Gauss","Sum of Two Integers – bit addition"]},
+  {topic:"Bit Manipulation",     tasks:["Reverse Integer","Bit tricks compendium","Bit manipulation in system design"]},
+  {topic:"Math & Geometry",      tasks:["Rotate Image – in-place matrix","Spiral Matrix – layer by layer","Set Matrix Zeroes – flag technique"]},
+  {topic:"Math & Geometry",      tasks:["Happy Number – cycle detection","Plus One – carry propagation","Pow(x,n) – fast exponentiation"]},
+  {topic:"Math & Geometry",      tasks:["Multiply Strings","Detect Squares","Math & Geometry patterns wrap-up"]},
+  {topic:"DSA Mock Interview",   tasks:["Timed mock: 2 medium + 1 hard problem","Review solutions & complexity analysis","Identify weak areas for revision"]},
+  {topic:"DSA Mock Interview",   tasks:["Full mock: array + tree + graph","Code review & optimization pass","Behavioral + DSA combined mock"]},
+];
 
-// ════════════════════════════════════════════════════════════
-// FULL CURRICULUM DATA
-// ════════════════════════════════════════════════════════════
+const LLD_TOPICS = [
+  {topic:"OOP & SOLID Principles",        tasks:["OOP pillars: encapsulation, inheritance, polymorphism, abstraction","SOLID: SRP, OCP, LSP with code examples","SOLID: ISP, DIP – dependency injection patterns"]},
+  {topic:"Design Patterns – Creational",  tasks:["Factory Method – motivation & Java implementation","Abstract Factory – family of products","Builder pattern – complex object construction"]},
+  {topic:"Design Patterns – Creational",  tasks:["Singleton – thread-safe lazy init, double-checked locking","Prototype pattern – deep cloning","Creational patterns review & interview Q&A"]},
+  {topic:"Design Patterns – Structural",  tasks:["Adapter – bridging incompatible interfaces","Decorator – dynamic behaviour extension","Facade – simplified interface over subsystem"]},
+  {topic:"Design Patterns – Behavioral",  tasks:["Strategy pattern – interchangeable algorithms","Observer pattern – event-driven updates","Command pattern – encapsulate requests"]},
+  {topic:"Design Patterns – Behavioral",  tasks:["State pattern – finite state machines","Template Method – algorithm skeleton","Iterator, Chain of Responsibility"]},
+  {topic:"LLD: Parking Lot",              tasks:["Requirements: vehicle types, floors, pricing","Class diagram – ParkingLot, Slot, Ticket, Vehicle","Implementation + payment processing"]},
+  {topic:"LLD: Elevator System",          tasks:["Requirements – multiple elevators, directions","Class diagram – Controller, Car, Request","Implement SCAN / LOOK scheduling"]},
+  {topic:"LLD: Splitwise",                tasks:["Requirements – users, expenses, splits, settle up","Class diagram – User, Group, Expense, Split","Implement expense calculation & balance sheet"]},
+  {topic:"LLD: BookMyShow",               tasks:["Requirements – movies, shows, seats","Class diagram – Theater, Screen, Show, Seat","Implement seat selection & concurrent booking"]},
+  {topic:"LLD: ATM",                      tasks:["Requirements – withdraw, deposit, balance, auth","Class diagram – ATM, Card, Account, Transaction","Implement state machine: idle→card→pin→txn"]},
+  {topic:"LLD: Chess",                    tasks:["Requirements – pieces, moves, check, checkmate","Class diagram – Board, Piece hierarchy, Game","Implement move validation & special moves"]},
+  {topic:"LLD: Snake and Ladder",         tasks:["Requirements – board, dice, players","Class diagram – Game, Board, Player, Snake, Ladder","Implementation & edge cases"]},
+  {topic:"LLD: Cricbuzz",                 tasks:["Requirements – live scores, matches, commentary","Class diagram – Match, Innings, Over, Ball","Implement observer for live score updates"]},
+  {topic:"LLD: Hotel Management",         tasks:["Requirements – rooms, guests, reservations, billing","Class diagram – Hotel, Room, Reservation, Guest","Implement check-in/out & pricing engine"]},
+  {topic:"LLD: Car Rental",               tasks:["Requirements – fleet, branches, bookings","Class diagram – Car, Branch, Reservation","Implement availability & pricing strategy"]},
+  {topic:"LLD: Food Delivery",            tasks:["Requirements – restaurants, menus, orders","Class diagram – Restaurant, Menu, Order, Agent","Implement order lifecycle & assignment"]},
+  {topic:"LLD: Cab Booking",              tasks:["Requirements – riders, drivers, trips, pricing","Class diagram – Rider, Driver, Trip, PricingStrategy","Implement matching, surge pricing, state machine"]},
+  {topic:"LLD: Notification System",      tasks:["Requirements – email/SMS/push, templates","Class diagram – NotificationService, Channel, Template","Implement chain of responsibility dispatch"]},
+  {topic:"LLD: Rate Limiter",             tasks:["Requirements – token bucket, sliding window","Class diagram – RateLimiter, TokenBucket, SlidingWindowLog","Thread-safe implementation in Java"]},
+  {topic:"LLD: Logging Framework",        tasks:["Requirements – levels, appenders, async","Class diagram – Logger, Appender, Formatter, LogEntry","Implement async logging with blocking queue"]},
+  {topic:"LLD Mock Interview",            tasks:["Design Library Management System (45 min)","Review class diagram & code quality","Discuss trade-offs & alternative designs"]},
+];
 
-const DSA = {
-  1: {
-    pattern: "Two Pointers & Fast/Slow Pointers",
-    theory: [
-      "Two Pointers: converging (left/right), same-direction (slow/fast)",
-      "When to use: sorted arrays, palindrome checks, pair-sum problems",
-      "Fast/Slow (Floyd's): cycle detection, middle of list, duplicate in range",
-    ],
-    template: `// Two Pointers — Converging
-function twoPointers(arr) {
-  let l = 0, r = arr.length - 1;
-  while (l < r) {
-    // process arr[l] and arr[r]
-    if (condition) l++;
-    else r--;
-  }
-}
-// Fast/Slow — Cycle Detection
-function hasCycle(head) {
-  let slow = head, fast = head;
-  while (fast && fast.next) {
-    slow = slow.next;
-    fast = fast.next.next;
-    if (slow === fast) return true;
-  }
-  return false;
-}`,
-    mustSolve: ["Valid Palindrome","Two Sum II (sorted)","Container With Most Water","3Sum","Trapping Rain Water","Linked List Cycle","Find the Duplicate Number","Linked List Cycle II"],
-    optional:  ["Four Sum","Sort Colors (Dutch Flag)","Move Zeroes","Happy Number"],
-    revisionNote: "Focus: edge cases with 0s, negatives; explain why two pointers works vs brute force",
-  },
-  2: {
-    pattern: "Sliding Window",
-    theory: [
-      "Fixed window: maintain exact size k, slide by adding right / removing left",
-      "Variable window: expand right until invalid, shrink left to restore validity",
-      "Key insight: avoid recomputation — update incrementally",
-      "HashMap usage: char frequency in window vs target",
-    ],
-    template: `// Variable Sliding Window
-function slidingWindow(s) {
-  let l = 0, res = 0;
-  const map = new Map();
-  for (let r = 0; r < s.length; r++) {
-    map.set(s[r], (map.get(s[r]) || 0) + 1);
-    while (/* window invalid */) {
-      map.set(s[l], map.get(s[l]) - 1);
-      if (!map.get(s[l])) map.delete(s[l]);
-      l++;
-    }
-    res = Math.max(res, r - l + 1);
-  }
-  return res;
-}`,
-    mustSolve: ["Longest Substring Without Repeating Characters","Minimum Window Substring","Permutation in String","Find All Anagrams in a String","Longest Repeating Character Replacement","Max Consecutive Ones III"],
-    optional:  ["Sliding Window Maximum","Fruit Into Baskets","Minimum Size Subarray Sum"],
-    revisionNote: "Drill: clearly define 'window valid' condition before coding",
-  },
-  3: {
-    pattern: "Hashing & Prefix Sum",
-    theory: [
-      "HashMap for O(1) lookup: frequency maps, complement lookup, grouping",
-      "Prefix sum: running sum array allows range sum in O(1)",
-      "Prefix sum + HashMap: subarray sum equals K in O(n)",
-      "Modular prefix sum for divisibility problems",
-    ],
-    template: `// Prefix Sum + HashMap (Subarray Sum = K)
-function subarraySum(nums, k) {
-  const map = new Map([[0, 1]]);
-  let sum = 0, res = 0;
-  for (const n of nums) {
-    sum += n;
-    res += (map.get(sum - k) || 0);
-    map.set(sum, (map.get(sum) || 0) + 1);
-  }
-  return res;
-}`,
-    mustSolve: ["Two Sum","Group Anagrams","Longest Consecutive Sequence","Subarray Sum Equals K","Product of Array Except Self","Top K Frequent Elements","Encode and Decode Strings"],
-    optional:  ["Contains Duplicate II","Valid Sudoku","Contiguous Array","Continuous Subarray Sum"],
-    revisionNote: "Common mistake: forgetting to initialize map with {0:1} for prefix sum patterns",
-  },
-  4: {
-    pattern: "Intervals & Binary Search",
-    theory: [
-      "Intervals: sort by start, merge overlapping, sweep line for scheduling",
-      "Meeting rooms: sort by start, min-heap tracking end times",
-      "Binary search: classic, rotated, search space (answer BS)",
-      "BS on answer: when asked for min/max satisfying a condition",
-    ],
-    template: `// Merge Intervals
-function merge(intervals) {
-  intervals.sort((a,b) => a[0]-b[0]);
-  const res = [intervals[0]];
-  for (const [s,e] of intervals.slice(1)) {
-    if (s <= res.at(-1)[1]) res.at(-1)[1] = Math.max(res.at(-1)[1], e);
-    else res.push([s,e]);
-  }
-  return res;
-}
-// Binary Search on Search Space
-function binarySearchAnswer(lo, hi, feasible) {
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (feasible(mid)) hi = mid;
-    else lo = mid + 1;
-  }
-  return lo;
-}`,
-    mustSolve: ["Merge Intervals","Insert Interval","Meeting Rooms II","Employee Free Time","Binary Search","Find Minimum in Rotated Sorted Array","Search in Rotated Sorted Array","Koko Eating Bananas","Capacity To Ship Packages","Median of Two Sorted Arrays"],
-    optional:  ["Non-overlapping Intervals","Minimum Number of Arrows","Time Based Key-Value Store","Find Peak Element"],
-    revisionNote: "BS invariant: always know which half to eliminate and why",
-  },
-  5: {
-    pattern: "Linked List, Stack & Monotonic Stack",
-    theory: [
-      "Linked list patterns: reversal, merge, fast/slow for middle/kth",
-      "Dummy head simplifies edge cases at head insertion/deletion",
-      "Stack: LIFO for matching brackets, next greater element",
-      "Monotonic stack: maintain increasing/decreasing order for span problems",
-    ],
-    template: `// Reverse Linked List (iterative)
-function reverse(head) {
-  let prev = null, curr = head;
-  while (curr) {
-    [curr.next, prev, curr] = [prev, curr, curr.next];
-  }
-  return prev;
-}
-// Monotonic Stack (Next Greater Element)
-function nextGreater(nums) {
-  const res = new Array(nums.length).fill(-1), stack = [];
-  for (let i = 0; i < nums.length; i++) {
-    while (stack.length && nums[stack.at(-1)] < nums[i])
-      res[stack.pop()] = nums[i];
-    stack.push(i);
-  }
-  return res;
-}`,
-    mustSolve: ["Reverse Linked List","Merge Two Sorted Lists","Reorder List","Remove Nth From End","Copy List with Random Pointer","Add Two Numbers","Valid Parentheses","Min Stack","Daily Temperatures","Largest Rectangle in Histogram"],
-    optional:  ["LRU Cache","Find the Duplicate Number","Rotate List","Car Fleet"],
-    revisionNote: "LRU cache is a common hidden linked-list problem — practice HashMap + DLL",
-  },
-  6: {
-    pattern: "Heap & Greedy",
-    theory: [
-      "Min-heap / Max-heap: top-K problems, merge K sorted, running median",
-      "Two-heap pattern: balance halves for median stream",
-      "Greedy: prove locally optimal = globally optimal; interval scheduling",
-      "When greedy fails: use DP",
-    ],
-    template: `// Top K Frequent (Bucket Sort O(n))
-function topKFrequent(nums, k) {
-  const freq = new Map(), buckets = Array.from({length:nums.length+1}, ()=>[]);
-  for (const n of nums) freq.set(n, (freq.get(n)||0)+1);
-  for (const [n,f] of freq) buckets[f].push(n);
-  const res = [];
-  for (let i = buckets.length-1; i >= 0 && res.length < k; i--)
-    res.push(...buckets[i]);
-  return res.slice(0,k);
-}`,
-    mustSolve: ["Kth Largest Element in Array","Top K Frequent Elements","K Closest Points to Origin","Task Scheduler","Jump Game","Jump Game II","Gas Station","Hand of Straights","Merge K Sorted Lists","Find Median from Data Stream"],
-    optional:  ["IPO","Single-Threaded CPU","Minimize Maximum Pair Sum","Reorganize String"],
-    revisionNote: "Heap problems: always think about what invariant to maintain in the heap",
-  },
-  7: {
-    pattern: "Trees: DFS, BFS, BST & Serialization",
-    theory: [
-      "DFS: pre/in/post order — use for path problems, construction",
-      "BFS: level order — use for shortest path in trees, level-by-level",
-      "BST properties: in-order traversal gives sorted order",
-      "LCA: binary lifting for large trees; recursion for standard LCA",
-      "Serialization: pre-order with null markers, or BFS level-order",
-    ],
-    template: `// DFS Path Sum
-function hasPathSum(root, target) {
-  if (!root) return false;
-  if (!root.left && !root.right) return root.val === target;
-  return hasPathSum(root.left, target-root.val) ||
-         hasPathSum(root.right, target-root.val);
-}
-// BFS Level Order
-function levelOrder(root) {
-  if (!root) return [];
-  const q = [root], res = [];
-  while (q.length) {
-    const level = [], len = q.length;
-    for (let i=0; i<len; i++) {
-      const node = q.shift();
-      level.push(node.val);
-      if (node.left)  q.push(node.left);
-      if (node.right) q.push(node.right);
-    }
-    res.push(level);
-  }
-  return res;
-}`,
-    mustSolve: ["Invert Binary Tree","Maximum Depth of Binary Tree","Diameter of Binary Tree","Balanced Binary Tree","Same Tree","Subtree of Another Tree","LCA of BST","Binary Tree Level Order","Binary Tree Right Side View","Count Good Nodes","Validate BST","Kth Smallest in BST","Construct from Preorder+Inorder","Serialize and Deserialize Binary Tree","Binary Tree Maximum Path Sum"],
-    optional:  ["Path Sum II","Sum Root to Leaf Numbers","Flatten Binary Tree to LL","Populating Next Right Pointers"],
-    revisionNote: "Recursive DFS: always handle null base case first; return type must be consistent",
-  },
-  8: {
-    pattern: "Graphs: BFS, DFS, Topological Sort & Shortest Path",
-    theory: [
-      "Graph representations: adjacency list (sparse), matrix (dense)",
-      "BFS: shortest path in unweighted, level-by-level exploration",
-      "DFS: connectivity, cycle detection, topological order",
-      "Topo sort: Kahn's (BFS + in-degree) or DFS post-order",
-      "Dijkstra: min-heap, greedy shortest path for non-negative weights",
-      "Bellman-Ford: handles negative weights, detects negative cycles",
-    ],
-    template: `// Topological Sort (Kahn's BFS)
-function topoSort(n, edges) {
-  const indegree = new Array(n).fill(0), adj = Array.from({length:n},()=>[]);
-  for (const [u,v] of edges) { adj[u].push(v); indegree[v]++; }
-  const q = [], res = [];
-  for (let i=0; i<n; i++) if (!indegree[i]) q.push(i);
-  while (q.length) {
-    const u = q.shift(); res.push(u);
-    for (const v of adj[u]) if (--indegree[v] === 0) q.push(v);
-  }
-  return res.length === n ? res : []; // empty = cycle
-}`,
-    mustSolve: ["Number of Islands","Max Area of Island","Clone Graph","Walls and Gates","Rotting Oranges","Pacific Atlantic Water Flow","Course Schedule","Course Schedule II","Graph Valid Tree","Number of Connected Components","Redundant Connection","Alien Dictionary","Network Delay Time","Cheapest Flights Within K Stops","Swim in Rising Water"],
-    optional:  ["Word Ladder","Reconstruct Itinerary","Min Cost to Connect All Points","Find Critical and Pseudo-Critical Edges"],
-    revisionNote: "Always clarify directed vs undirected; cycle detection differs between them",
-  },
-  9: {
-    pattern: "Backtracking, Trie & Union-Find",
-    theory: [
-      "Backtracking: explore → recurse → undo (three-step mental model)",
-      "Pruning: sort + skip duplicates for subset/combination problems",
-      "Trie: prefix tree for autocomplete, word search; O(L) ops",
-      "Union-Find with path compression + union by rank: near O(1) amortized",
-    ],
-    template: `// Backtracking Template
-function backtrack(result, current, start, candidates) {
-  result.push([...current]);
-  for (let i = start; i < candidates.length; i++) {
-    if (i > start && candidates[i] === candidates[i-1]) continue; // skip dup
-    current.push(candidates[i]);
-    backtrack(result, current, i+1, candidates);
-    current.pop();
-  }
-}
-// Union-Find
-class UF {
-  constructor(n) { this.p = Array.from({length:n},(_,i)=>i); this.rank=new Array(n).fill(0); }
-  find(x) { if (this.p[x]!==x) this.p[x]=this.find(this.p[x]); return this.p[x]; }
-  union(a,b) { const [pa,pb]=[this.find(a),this.find(b)]; if(pa===pb)return false; if(this.rank[pa]<this.rank[pb])this.p[pa]=pb; else if(this.rank[pa]>this.rank[pb])this.p[pb]=pa; else{this.p[pb]=pa;this.rank[pa]++;} return true; }
-}`,
-    mustSolve: ["Subsets","Subsets II","Combination Sum","Combination Sum II","Permutations","Permutations II","Word Search","N-Queens","Palindrome Partitioning","Implement Trie","Design Add and Search Words","Word Search II","Redundant Connection","Accounts Merge","Number of Connected Components"],
-    optional:  ["Letter Combinations of Phone Number","Generate Parentheses","Sudoku Solver","Expression Add Operators"],
-    revisionNote: "Backtracking: draw recursion tree before coding; identify choices, constraints, goals",
-  },
-  10: {
-    pattern: "Dynamic Programming: 1D, 2D, Knapsack & String DP",
-    theory: [
-      "DP = recursion + memoization (top-down) or tabulation (bottom-up)",
-      "Identify: optimal substructure + overlapping subproblems",
-      "1D DP: Fibonacci-style, house robber, climbing stairs",
-      "Knapsack 0/1: take or leave each item; 2D table dp[i][w]",
-      "String DP: LCS, edit distance; dp[i][j] for two strings",
-      "State machine DP: stock problems with cooldown/transaction limits",
-    ],
-    template: `// 0/1 Knapsack
-function knapsack(weights, values, W) {
-  const n = weights.length, dp = Array.from({length:n+1},()=>new Array(W+1).fill(0));
-  for (let i=1; i<=n; i++)
-    for (let w=0; w<=W; w++) {
-      dp[i][w] = dp[i-1][w];
-      if (weights[i-1] <= w) dp[i][w] = Math.max(dp[i][w], dp[i-1][w-weights[i-1]]+values[i-1]);
-    }
-  return dp[n][W];
-}
-// LCS
-function lcs(s1, s2) {
-  const dp = Array.from({length:s1.length+1},()=>new Array(s2.length+1).fill(0));
-  for (let i=1; i<=s1.length; i++)
-    for (let j=1; j<=s2.length; j++)
-      dp[i][j] = s1[i-1]===s2[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j],dp[i][j-1]);
-  return dp[s1.length][s2.length];
-}`,
-    mustSolve: ["Climbing Stairs","Min Cost Climbing Stairs","House Robber","House Robber II","Longest Palindromic Substring","Palindromic Substrings","Decode Ways","Coin Change","Maximum Product Subarray","Word Break","Longest Increasing Subsequence","Partition Equal Subset Sum","Target Sum","Edit Distance","Longest Common Subsequence","Distinct Subsequences","Interleaving String","Regular Expression Matching"],
-    optional:  ["Burst Balloons","Remove Boxes","Strange Printer"],
-    revisionNote: "Draw the DP table for string problems before writing code",
-  },
-  11: {
-    pattern: "Bit Manipulation & Math",
-    theory: [
-      "Bit ops: AND (&), OR (|), XOR (^), NOT (~), left shift (<<), right shift (>>)",
-      "XOR tricks: a^a=0, a^0=a — find single number, missing number",
-      "Bit masking: check bit i → (n>>i)&1; set bit i → n|(1<<i); clear → n&~(1<<i)",
-      "Count set bits: Brian Kernighan → n &= (n-1) removes lowest set bit",
-      "Math: GCD (Euclidean), LCM, Sieve of Eratosthenes for primes up to N",
-      "Modular arithmetic: (a*b) % m = ((a%m)*(b%m)) % m; fast exponentiation",
-    ],
-    template: `// XOR — Find the single number
-function singleNumber(nums) {
-  return nums.reduce((xor, n) => xor ^ n, 0);
-}
-// Count set bits (Brian Kernighan)
-function countBits(n) {
-  let count = 0;
-  while (n) { n &= n - 1; count++; }
-  return count;
-}
-// Sieve of Eratosthenes
-function sieve(n) {
-  const isPrime = new Array(n+1).fill(true);
-  isPrime[0] = isPrime[1] = false;
-  for (let i=2; i*i<=n; i++)
-    if (isPrime[i])
-      for (let j=i*i; j<=n; j+=i) isPrime[j]=false;
-  return isPrime;
-}
-// Fast Exponentiation (mod)
-function powMod(base, exp, mod) {
-  let result = 1; base %= mod;
-  while (exp > 0) {
-    if (exp & 1) result = result * base % mod;
-    base = base * base % mod; exp >>= 1;
-  }
-  return result;
-}`,
-    mustSolve: ["Single Number","Number of 1 Bits","Counting Bits","Reverse Bits","Missing Number","Sum of Two Integers","Reverse Integer","Pow(x,n)","Multiply Strings","Detect Squares"],
-    optional:  ["Single Number II","Single Number III","Bitwise AND of Numbers Range","Maximum XOR of Two Numbers in an Array"],
-    revisionNote: "Bit manipulation: always verify with small examples like n=6 (110 in binary)",
-  },
-  12: {
-    pattern: "Advanced Graphs: MST, Shortest Path & Advanced Algorithms",
-    theory: [
-      "Dijkstra: min-heap + dist array; O((V+E) log V); no negative weights",
-      "Bellman-Ford: relax all edges V-1 times; detects negative cycles; O(VE)",
-      "Floyd-Warshall: all-pairs shortest path; dp[i][j] via intermediate nodes; O(V³)",
-      "Prim's MST: greedy, min-heap, pick minimum edge crossing the cut; O(E log V)",
-      "Kruskal's MST: sort edges by weight, use Union-Find to avoid cycles; O(E log E)",
-      "Bridges & Articulation points: Tarjan's DFS with low-link values",
-    ],
-    template: `// Dijkstra
-function dijkstra(graph, src, n) {
-  const dist = new Array(n).fill(Infinity); dist[src] = 0;
-  const heap = [[0, src]]; // [cost, node]
-  while (heap.length) {
-    heap.sort((a,b) => a[0]-b[0]);
-    const [d, u] = heap.shift();
-    if (d > dist[u]) continue;
-    for (const [v, w] of (graph[u] || [])) {
-      if (dist[u] + w < dist[v]) { dist[v] = dist[u]+w; heap.push([dist[v],v]); }
-    }
-  }
-  return dist;
-}
-// Kruskal's MST
-function kruskal(n, edges) {
-  edges.sort((a,b) => a[2]-b[2]);
-  const uf = new UF(n); let cost = 0, count = 0;
-  for (const [u,v,w] of edges) {
-    if (uf.union(u,v)) { cost += w; count++; }
-    if (count === n-1) break;
-  }
-  return count === n-1 ? cost : -1;
-}`,
-    mustSolve: ["Network Delay Time","Cheapest Flights Within K Stops","Path With Minimum Effort","Swim in Rising Water","Min Cost to Connect All Points","Find Critical and Pseudo-Critical Edges","Reconstruct Itinerary","Remove Max Number of Edges to Keep Graph Fully Traversable"],
-    optional:  ["Evaluate Division","Shortest Path Visiting All Nodes","Count Paths That Can Form a Palindrome in a Tree"],
-    revisionNote: "Know when to use Dijkstra (non-negative) vs Bellman-Ford (negative edges) vs Floyd-Warshall (all-pairs)",
-  },
-  13: {
-    pattern: "2D DP, Interval DP & Advanced DP Patterns",
-    theory: [
-      "2D DP: dp[i][j] typically means 'result using first i items and capacity/index j'",
-      "Interval DP: dp[i][j] = result for subarray/substring from i to j; fill by length",
-      "DP on strings: Edit Distance, LCS, Wildcard/Regex matching — 2D table",
-      "Sequence DP: LIS with patience sorting O(n log n), LCIS",
-      "DP with bitmask: TSP, set cover problems; dp[mask][i]",
-      "Digit DP: count numbers in [L,R] satisfying constraints; dp[pos][tight][state]",
-    ],
-    template: `// Edit Distance
-function editDistance(w1, w2) {
-  const m=w1.length, n=w2.length;
-  const dp = Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i||j));
-  for (let i=1;i<=m;i++)
-    for (let j=1;j<=n;j++)
-      dp[i][j] = w1[i-1]===w2[j-1] ? dp[i-1][j-1]
-               : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-  return dp[m][n];
-}
-// Interval DP (Burst Balloons)
-function maxCoins(nums) {
-  const arr = [1, ...nums, 1], n = arr.length;
-  const dp = Array.from({length:n}, ()=>new Array(n).fill(0));
-  for (let len=2; len<n; len++)
-    for (let l=0; l<n-len; l++) {
-      const r = l+len;
-      for (let k=l+1; k<r; k++)
-        dp[l][r] = Math.max(dp[l][r], dp[l][k]+arr[l]*arr[k]*arr[r]+dp[k][r]);
-    }
-  return dp[0][n-1];
-}`,
-    mustSolve: ["Unique Paths","Unique Paths II","Longest Common Subsequence","Best Time to Buy and Sell Stock with Cooldown","Best Time to Buy and Sell Stock III","Best Time to Buy and Sell Stock IV","Edit Distance","Burst Balloons","Regular Expression Matching","Wildcard Matching","Interleaving String","Distinct Subsequences","Longest Increasing Path in a Matrix"],
-    optional:  ["Strange Printer","Remove Boxes","Stone Game","Minimum Cost to Cut a Stick"],
-    revisionNote: "Interval DP: always fill by increasing length (outer loop), not by i or j",
-  },
-  14: {
-    pattern: "Arrays & Sorting: Fundamentals + Advanced",
-    theory: [
-      "Kadane's algorithm: max subarray sum in O(n); extension to 2D (max sub-rectangle)",
-      "Sorting algorithms: QuickSort (avg O(n log n)), MergeSort (stable, O(n log n)), HeapSort",
-      "Custom sort: comparators, multi-key sorting, Dutch National Flag (3-way partition)",
-      "Matrix traversal: rotate 90°, spiral order, set zeros — in-place tricks",
-      "Cyclic sort: for arrays with elements in range [1, n]; finds missing/duplicate in O(n)",
-      "Boyer-Moore Voting: majority element in O(n) time, O(1) space",
-    ],
-    template: `// Kadane's Max Subarray
-function maxSubArray(nums) {
-  let cur = nums[0], res = nums[0];
-  for (let i=1; i<nums.length; i++) {
-    cur = Math.max(nums[i], cur + nums[i]);
-    res = Math.max(res, cur);
-  }
-  return res;
-}
-// Boyer-Moore Voting (Majority Element)
-function majorityElement(nums) {
-  let count = 0, candidate = null;
-  for (const n of nums) {
-    if (!count) candidate = n;
-    count += n === candidate ? 1 : -1;
-  }
-  return candidate;
-}
-// Rotate Matrix 90° clockwise (in-place)
-function rotate(matrix) {
-  const n = matrix.length;
-  // Transpose
-  for (let i=0; i<n; i++) for (let j=i+1; j<n; j++)
-    [matrix[i][j], matrix[j][i]] = [matrix[j][i], matrix[i][j]];
-  // Reverse each row
-  for (let i=0; i<n; i++) matrix[i].reverse();
-}`,
-    mustSolve: ["Maximum Subarray","Maximum Product Subarray","Rotate Image","Set Matrix Zeroes","Spiral Matrix","Find the Duplicate Number","First Missing Positive","Majority Element","Sort Colors","Largest Number"],
-    optional:  ["Game of Life","Next Permutation","Wiggle Sort II","Count of Smaller Numbers After Self"],
-    revisionNote: "Arrays: many problems solvable with in-place tricks — always ask 'can I modify the input?'",
-  },
-};
-
-const HLD = {
-  1: {
-    topic: "Foundations: Scalability, Availability, CAP, PACELC",
-    theory: ["Horizontal vs Vertical scaling, stateless design","Availability = uptime / (uptime+downtime); nines math (99.9% = 8.76h downtime/yr)","CAP: Consistency, Availability, Partition Tolerance — can only guarantee 2","PACELC: extends CAP with latency/consistency tradeoff under normal operation","Reliability: redundancy, fault isolation, graceful degradation"],
-    readingLinks: ["https://github.com/ashishps1/awesome-system-design-resources","Martin Kleppmann — Designing Data-Intensive Applications Ch. 1"],
-    question: "Design a Global CDN",
-    tradeoffs: ["Push vs Pull CDN for different content freshness needs","Edge caching vs origin shield architecture","DNS-based vs Anycast routing"],
-  },
-  2: {
-    topic: "Networking: DNS, HTTP/HTTPS, Load Balancers, API Gateway",
-    theory: ["DNS resolution chain: recursive vs iterative; TTL implications","HTTP/1.1 vs HTTP/2 (multiplexing) vs HTTP/3 (QUIC)","L4 vs L7 load balancing; algorithms: round-robin, least-conn, IP-hash","Reverse proxy, forward proxy, API Gateway as single-entry","TLS handshake, certificate pinning, mutual TLS"],
-    readingLinks: ["ByteByteGo — How does HTTPS work?","Cloudflare Learning Center — What is a load balancer?"],
-    question: "Design a URL Shortener (short.ly)",
-    tradeoffs: ["Base62 encoding vs hash collision handling","Read-heavy: cache aggressively; custom domains add complexity"],
-  },
-  3: {
-    topic: "Caching: Redis, Patterns, Eviction",
-    theory: ["Cache-aside (lazy loading): read from cache, miss → DB → populate","Write-through: write to cache + DB synchronously; consistent but slower writes","Write-back: write to cache, async flush to DB; fast but data loss risk","Cache eviction: LRU, LFU, FIFO, TTL-based expiry","Cache stampede / thundering herd: probabilistic early expiry, mutex lock"],
-    readingLinks: ["Redis official docs — Data Types","AWS ElastiCache — Caching Strategies"],
-    question: "Design a Distributed Cache Layer (like Redis Cluster)",
-    tradeoffs: ["Consistent hashing for node addition/removal","Memory vs disk persistence (RDB vs AOF)","Single-threaded Redis model and why it works"],
-  },
-  4: {
-    topic: "Storage: SQL, NoSQL, Indexing, Partitioning, Replication",
-    theory: ["ACID (Atomicity, Consistency, Isolation, Durability) in relational DBs","NoSQL types: document (MongoDB), wide-column (Cassandra), KV (DynamoDB), graph","B-Tree vs LSM-Tree index structures — read vs write optimization","Horizontal partitioning (sharding) by range, hash, list; hotspot mitigation","Leader-follower replication; multi-leader; leaderless (quorum reads/writes)"],
-    readingLinks: ["DDIA Ch. 3 — Storage and Retrieval","DDIA Ch. 5 — Replication"],
-    question: "Design a Multi-Region User Service",
-    tradeoffs: ["Strong vs eventual consistency trade-off for global writes","Read replicas for geographic latency reduction","Schema flexibility (NoSQL) vs query power (SQL)"],
-  },
-  5: {
-    topic: "Messaging: Kafka, Pub/Sub, Event-Driven Architecture",
-    theory: ["Kafka architecture: brokers, topics, partitions, consumer groups, offsets","Producer acks: 0 / 1 / all — durability vs latency tradeoff","Exactly-once semantics: idempotent producers + transactional API","Consumer group rebalancing: triggers, strategies (eager vs cooperative)","Event sourcing vs event streaming; CQRS pattern","Dead letter queues, retry topics, poison pill handling"],
-    readingLinks: ["Confluent — Kafka in a Nutshell","Engineering at Meta — Real-time data pipeline"],
-    question: "Design a Notification Service (Email + Push + SMS)",
-    tradeoffs: ["Fan-out on write vs fan-out on read","Rate limiting per channel to avoid spam","Multi-tenant isolation in shared Kafka cluster"],
-  },
-  6: {
-    topic: "Distributed Transactions: 2PC, Saga, Distributed Locks",
-    theory: ["2PC (Two-Phase Commit): prepare + commit; coordinator SPOF problem","Saga pattern: choreography (event-driven) vs orchestration (central coordinator)","Compensating transactions for rollback in Sagas","Distributed locks: Redis SETNX, Redlock algorithm, ZooKeeper","Idempotency keys: UUID per request, deduplication window"],
-    readingLinks: ["DDIA Ch. 9 — Consistency and Consensus","Stripe Engineering — Idempotency"],
-    question: "Design a Payment System",
-    tradeoffs: ["Saga vs 2PC: complexity vs consistency guarantee","Idempotency at API layer vs event layer","Ledger vs balance model for account storage"],
-  },
-  7: {
-    topic: "Rate Limiting & Traffic Control",
-    theory: ["Token bucket: allows bursts, smooth refill rate — good for API limits","Leaky bucket: constant output rate, absorbs bursts — good for network shaping","Sliding window log: accurate but memory-heavy","Sliding window counter: approximate, memory-efficient hybrid","Distributed rate limiting: Redis INCR + TTL, Lua scripts for atomicity"],
-    readingLinks: ["Cloudflare Engineering — How we built ratelimiting","AWS API Gateway — Throttling"],
-    question: "Design a Distributed Rate Limiter",
-    tradeoffs: ["Per-user vs per-IP vs per-endpoint granularity","Global vs per-region limits for geo-distributed services","Hard limit vs soft limit vs circuit breaker strategy"],
-  },
-  8: {
-    topic: "System Case Study: Chat & Real-Time Systems",
-    theory: ["WebSockets: full-duplex, persistent connection; vs SSE (one-way)","Presence service: heartbeat + TTL, subscribe-notify pattern","Message ordering: logical clocks (Lamport), vector clocks","Fan-out: write to each recipient's mailbox (push) or compute on read (pull)","Storage: recent messages in Redis, historical in Cassandra (time-series friendly)"],
-    readingLinks: ["High Scalability — WhatsApp Architecture","ByteByteGo — Design WhatsApp"],
-    question: "Design WhatsApp (1-on-1 + Group Chat)",
-    tradeoffs: ["Push vs pull message delivery","Offline message queueing strategy","End-to-end encryption key exchange design"],
-  },
-  9: {
-    topic: "System Case Study: Ride Hailing & Geo-Search",
-    theory: ["Geo-indexing: Geohash (string prefix) vs H3 (Uber hexagons) vs Quadtree","Driver matching: supply-demand proximity scoring, weighted bipartite matching","Location updates: write-heavy stream; batch vs streaming ingestion","Trip state machine: REQUESTED → ACCEPTED → ARRIVED → IN_RIDE → COMPLETED","Surge pricing: real-time supply/demand ratio across geo cells"],
-    readingLinks: ["Uber Engineering Blog — H3 Geo Grid","ByteByteGo — Design Uber"],
-    question: "Design Uber (Driver Matching + Dispatch)",
-    tradeoffs: ["Strong consistency for trip state vs eventual for driver location","Geohash cell size vs query precision tradeoff","WebSocket vs polling for driver location stream"],
-  },
-  10: {
-    topic: "System Case Study: News Feed & Recommendation",
-    theory: ["Feed generation: push (fan-out on write) vs pull (fan-out on read) vs hybrid","Ranking signals: recency, engagement, relationship strength, ML score","Content graph: following relationships, interest vectors","Timeline cache: Redis sorted set by timestamp per user","Recommendation: collaborative filtering, content-based, matrix factorization"],
-    readingLinks: ["Meta Engineering — News Feed Ranking","Spotify Engineering — Discover Weekly"],
-    question: "Design Twitter/Instagram Feed",
-    tradeoffs: ["Celebrity user fan-out problem (millions of followers)","Hot vs cold storage for old posts","Read-heavy optimization vs write amplification"],
-  },
-  11: {
-    topic: "System Case Study: Video Streaming & Search",
-    theory: ["Video ingestion: upload → transcode (HLS/DASH chunks) → CDN distribute","Adaptive bitrate streaming: client selects quality based on bandwidth","Search: inverted index (Elasticsearch), tokenization, relevance scoring BM25","Video metadata vs video bytes: different storage and access patterns","P2P CDN: BitTorrent-inspired for large-scale distribution"],
-    readingLinks: ["Netflix Tech Blog — Encoding and CDN","Elasticsearch Guide — Inverted Index"],
-    question: "Design Netflix + YouTube Search",
-    tradeoffs: ["Pre-encoding all resolutions vs on-demand transcoding","Warm vs cold CDN cache for niche content","Real-time search suggestions vs batch index rebuild"],
-  },
-};
-
-const LLD = {
-  1: {
-    topic: "OOP, SOLID Principles & Clean Code",
-    theory: ["SRP: one reason to change; extract concerns into separate classes","OCP: open for extension (abstract/interface), closed for modification","LSP: subclasses must be substitutable for their superclass","ISP: many small interfaces better than one large; avoid fat interfaces","DIP: depend on abstractions; inject concrete implementations","Code smells: long method, feature envy, data clumps, primitive obsession"],
-    question: "Refactor: Design a Notification System applying all 5 SOLID principles",
-    machineCode: false,
-  },
-  2: {
-    topic: "Creational Patterns: Factory, Abstract Factory, Builder, Singleton",
-    theory: ["Factory Method: delegate object creation to subclasses; decouples client from concrete type","Abstract Factory: factory of factories; families of related objects","Builder: step-by-step construction for complex objects with many optional fields","Singleton: single instance guarantee; thread-safe via double-checked locking or enum (Java)","Prototype: clone existing objects; useful when creation is expensive"],
-    question: "Implement: Thread-safe Singleton + Logger Factory with file/console strategies",
-    machineCode: false,
-  },
-  3: {
-    topic: "Behavioral Patterns: Strategy, Observer, Command, State",
-    theory: ["Strategy: encapsulate algorithms, swap at runtime; eliminates conditionals","Observer: publish-subscribe; event bus, decoupled components","Command: encapsulate request as object; undo/redo, queuing, logging","State: objects whose behavior changes with internal state; eliminates switch/if chains","Chain of Responsibility: pass request through handlers until processed"],
-    question: "Implement: Event-driven Order Processing with Strategy (pricing) + Observer (notifications)",
-    machineCode: false,
-  },
-  4: {
-    topic: "Structural Patterns: Adapter, Decorator, Proxy, Facade",
-    theory: ["Adapter: bridge incompatible interfaces; wraps existing class","Decorator: add responsibilities dynamically; composable middleware","Proxy: control access; virtual (lazy), remote, protection proxy","Facade: simplify complex subsystem; single entry point","Composite: tree structures; treat leaf and composite uniformly"],
-    question: "Implement: HTTP middleware chain using Decorator + Legacy API Adapter",
-    machineCode: false,
-  },
-  5: {
-    topic: "Concurrency: Threads, Locks, Semaphores & Deadlock Prevention",
-    theory: ["Thread lifecycle: NEW → RUNNABLE → BLOCKED/WAITING → TERMINATED","Mutex: mutual exclusion; only one thread at a time","Semaphore: counting permits; producer-consumer, connection pools","Deadlock: four conditions (MCWN); prevention strategies","ReentrantLock vs synchronized in Java; TTAS vs TAS spinlocks","Java memory model: happens-before, visibility, volatile, atomic classes"],
-    question: "Implement: Thread-safe Blocking Queue (producer-consumer) with proper locks",
-    machineCode: true,
-  },
-  6: {
-    topic: "Java Collections Internals: HashMap, ConcurrentHashMap, ArrayList",
-    theory: ["HashMap: array of buckets, hash function, collision (chaining), load factor 0.75, resize","TreeMap: Red-Black tree, O(log n) ops, sorted keys","ConcurrentHashMap: segment locking (Java 7) → CAS + synchronized bucket (Java 8)","ArrayList: dynamic array, amortized O(1) add, O(n) insert-at-index","LinkedHashMap: HashMap + doubly-linked list for insertion order (LRU cache base)","PriorityQueue: binary heap, O(log n) offer/poll"],
-    question: "Implement: LRU Cache using LinkedHashMap internals + thread-safe version",
-    machineCode: true,
-  },
-  7: {
-    topic: "API Design: REST, gRPC, Idempotency, Versioning",
-    theory: ["REST: resources as nouns, HTTP verbs for actions, stateless, HATEOAS","gRPC: Protocol Buffers, bidirectional streaming, strongly typed contracts","Idempotency: safe re-execution; POST idempotency via idempotency-key header","API versioning: URL path (/v1/), header, query param — tradeoffs","Rate limiting in API: 429 response, Retry-After header, exponential backoff","OpenAPI / Swagger for contract-first development"],
-    question: "Design: Complete REST + gRPC API for a Ride-Sharing Dispatch Service",
-    machineCode: false,
-  },
-  8: {
-    topic: "Database Schema Design: Normalization, Denormalization, Indexing",
-    theory: ["Normal forms: 1NF→2NF→3NF→BCNF; eliminate partial/transitive dependencies","Denormalization: intentional redundancy for read performance","Index types: B-tree (range queries), Hash (equality), Composite (column order matters)","EXPLAIN / query plan analysis; covering index vs index scan vs seq scan","Schema evolution: additive changes safe; column removal/rename needs migration strategy","Multi-tenancy: shared schema (tenant_id column) vs separate schema vs separate DB"],
-    question: "Design: Complete database schema for an E-Commerce platform (users, orders, inventory, payments)",
-    machineCode: false,
-  },
-  9: {
-    topic: "Machine Coding: Parking Lot",
-    theory: ["Entity identification: ParkingLot, Floor, Spot (Compact/Large/Handicapped), Vehicle, Ticket, Payment","Strategy pattern for billing (hourly, flat, subscription)","Observer for availability notifications","Singleton for ParkingLot (one instance per location)"],
-    question: "Implement: Full Parking Lot — allocation, billing, vehicle types, availability tracking",
-    machineCode: true,
-  },
-  10: {
-    topic: "Machine Coding: Elevator System",
-    theory: ["State machine: IDLE, MOVING_UP, MOVING_DOWN, DOOR_OPEN","SCAN algorithm (elevator algorithm): serve requests in current direction first","Request types: internal (floor button) vs external (hall button with direction)","Priority queue for scheduled floors; multiple elevator coordination"],
-    question: "Implement: Elevator Controller with SCAN scheduling + multi-elevator support",
-    machineCode: true,
-  },
-  11: {
-    topic: "Machine Coding: Splitwise & Movie Booking",
-    theory: ["Splitwise: debt simplification (graph, minimize transactions), expense categories","Movie Booking: concurrent seat reservation (optimistic locking), seat map","State machines for booking: AVAILABLE → HELD → BOOKED → CANCELLED","Event sourcing for audit trail in financial splits"],
-    question: "Implement: Splitwise debt simplification + Movie seat concurrent reservation",
-    machineCode: true,
-  },
-};
+const HLD_TOPICS = [
+  {topic:"Fundamentals & Scalability",  tasks:["Horizontal vs vertical scaling","CAP Theorem – consistency, availability, partition","Consistency models – strong, eventual, causal"]},
+  {topic:"Networking & Proxies",        tasks:["Load balancing – round robin, least conn, IP hash","Reverse proxy vs forward proxy","CDN – push vs pull, edge caching, anycast"]},
+  {topic:"Caching",                     tasks:["Caching strategies – cache-aside, write-through, write-behind","Cache eviction – LRU, LFU, TTL","Redis deep dive – data structures, cluster, persistence"]},
+  {topic:"Databases",                   tasks:["SQL vs NoSQL – when to use each","Database indexes – B-tree, hash, composite, covering","Query optimization – EXPLAIN, N+1 problem"]},
+  {topic:"Database Scaling",            tasks:["Read replicas – sync vs async replication","Database sharding – range, hash, directory","Consistent hashing – virtual nodes, ring routing"]},
+  {topic:"Storage",                     tasks:["Blob/object storage – S3 architecture, multi-part upload","HDFS – distributed file system concepts","Storage tiers – hot, warm, cold archival"]},
+  {topic:"Messaging & Events",          tasks:["Kafka deep dive – partitions, offsets, consumer groups","Kafka guarantees – at-most-once, at-least-once, exactly-once","RabbitMQ – exchanges, routing keys, DLQ"]},
+  {topic:"Event-Driven Systems",        tasks:["Event sourcing – append-only log, event replay","CQRS – command query responsibility segregation","Saga pattern – distributed transaction coordination"]},
+  {topic:"Reliability",                 tasks:["Circuit breaker – closed, open, half-open","Retry strategies – exponential backoff, jitter","Bulkhead & timeout patterns"]},
+  {topic:"HLD: TinyURL",               tasks:["Requirements + capacity estimation (100M URLs)","API design, data model, KV store choice","Architecture – encode service, redirect, counter; trade-offs"]},
+  {topic:"HLD: WhatsApp / Chat",        tasks:["WebSocket vs long polling for real-time","Message ordering, storage, E2E encryption overview","Architecture – chat, presence, notification; capacity 50B msgs/day"]},
+  {topic:"HLD: Uber",                   tasks:["Location service – geohashing, S2 library","Matching algorithm – dispatch, surge pricing","Architecture + capacity: 10M trips/day, GPS 1/4s per driver"]},
+  {topic:"HLD: YouTube",               tasks:["Video pipeline – upload → transcode (HLS/DASH) → CDN","Capacity: 500hr video uploaded/min","Architecture – metadata DB, video store, CDN, search; trade-offs"]},
+  {topic:"HLD: Instagram",             tasks:["Fan-out strategies – push vs pull vs hybrid feed","Photo storage – CDN + object store pipeline","Capacity: 100M DAU, 1B photos; celebrity account problem"]},
+  {topic:"HLD: Twitter/X",             tasks:["Timeline generation – fan-out on write vs read","Trending topics – stream processing with Kafka","Architecture + capacity; trade-offs: stale timelines"]},
+  {topic:"HLD: Netflix",               tasks:["Adaptive bitrate streaming (ABR), CDN Open Connect","Content encoding pipeline – per-title encoding","Architecture – recommendation, billing, CDN; trade-offs"]},
+  {topic:"HLD: Google Drive",          tasks:["Block-level sync – deduplication with content hash","Conflict resolution for concurrent edits","Architecture + capacity: 1B users × 15GB; trade-offs"]},
+  {topic:"HLD: Distributed Cache",     tasks:["Consistent hashing ring with virtual nodes","Replication factor, read/write quorums","Trade-offs: accuracy vs performance, multi-DC sync"]},
+  {topic:"HLD: Distributed Rate Limiter",tasks:["Redis sliding window with Lua atomic scripts","Per-user, per-IP, global limits, multi-region","Trade-offs: accuracy vs performance"]},
+  {topic:"HLD: Notification System",   tasks:["Architecture – notification service, template engine, dispatcher","Retry, dedup, delivery receipts, opt-out management","Multi-channel: email, SMS, push, in-app"]},
+  {topic:"HLD: News Feed",             tasks:["Feed ranking – ML signals overview","Architecture – feed service, ranking, cache warming","Trade-offs: freshness vs performance"]},
+  {topic:"HLD: Distributed Queue",     tasks:["Architecture – partitioned, replicated queue (SQS model)","Trade-offs: ordering guarantees, exactly-once delivery","DLQ, visibility timeout, ack design"]},
+  {topic:"HLD Mock Interview",         tasks:["Design Dropbox (45 min timed)","Whiteboard: capacity, API, architecture, scaling","Feedback: trade-off reasoning quality"]},
+];
 
 const JAVA_TOPICS = [
-  "JVM Architecture: heap, stack, metaspace, GC roots",
-  "Garbage Collection: GC algorithms (G1, ZGC, Shenandoah), tuning flags",
-  "Class Loading: bootstrap → extension → application classloaders, delegation model",
-  "HashMap Internals: hash function, collision chaining, Java 8 tree bins, resize",
-  "ConcurrentHashMap: CAS operations, bucket-level synchronization, compute methods",
-  "ExecutorService: thread pool sizing (CPU vs IO bound), ForkJoinPool",
-  "CompletableFuture: composition, exceptionally, whenComplete, async pipelines",
-  "Java Memory Model: happens-before, volatile semantics, atomic classes",
-  "Spring Core: IoC container, bean scopes (singleton/prototype), lifecycle callbacks",
-  "Spring Transactions: @Transactional propagation, isolation levels, rollback rules",
-  "Spring AOP: proxy types (JDK dynamic vs CGLIB), pointcut expressions, advice types",
-  "Kafka + Spring: @KafkaListener, consumer group config, error handling, DLT",
+  {topic:"JVM Architecture",          tasks:["JDK vs JRE vs JVM – component breakdown","JVM memory: heap (young/old gen), stack, metaspace, code cache","Class loading – bootstrap, extension, application classloaders"]},
+  {topic:"Memory & GC",               tasks:["GC algorithms – Serial, Parallel, CMS, G1, ZGC","GC tuning flags – heap size, GC policy, pause targets","Memory leaks – jmap, jstack, VisualVM, JFR"]},
+  {topic:"Collections – Core",        tasks:["HashMap internals – hashing, buckets, load factor, treeification","ConcurrentHashMap – segment locking → CAS evolution","TreeMap (Red-Black Tree), LinkedHashMap (insertion order)"]},
+  {topic:"Collections – Advanced",    tasks:["ArrayList vs LinkedList – cache locality, complexity","PriorityQueue – heap internals","Fail-fast vs fail-safe – CopyOnWriteArrayList"]},
+  {topic:"Concurrency – Basics",      tasks:["Thread lifecycle, daemon threads","Executors – Fixed, Cached, Scheduled, ForkJoin pools","Callable, Future, FutureTask – cancellation patterns"]},
+  {topic:"Concurrency – Primitives",  tasks:["synchronized – monitor object internals","volatile – happens-before guarantee, visibility","Atomic classes – CAS, AtomicInteger, AtomicReference"]},
+  {topic:"Concurrency – Locks",       tasks:["ReentrantLock, ReadWriteLock, StampedLock","Condition variables – await/signal pattern","CountDownLatch, CyclicBarrier, Semaphore, Phaser"]},
+  {topic:"Concurrency – Advanced",    tasks:["CompletableFuture – thenApply, thenCompose, allOf, anyOf","ForkJoinPool – work stealing algorithm","ThreadLocal – per-thread state, memory leak pitfalls"]},
+  {topic:"Java 8+ – Streams",         tasks:["Lambda expressions – functional interfaces, method refs","Stream API – lazy evaluation, intermediate & terminal ops","Optional – avoiding NPE, flatMap patterns"]},
+  {topic:"Java 8+ – APIs",            tasks:["Default & static interface methods","Date/Time API – LocalDate, ZonedDateTime, Duration","Map.computeIfAbsent, merge, forEach patterns"]},
+  {topic:"Spring – Core",             tasks:["IoC container – BeanFactory vs ApplicationContext","DI – constructor, setter, field injection","Bean scopes – singleton, prototype, request, session"]},
+  {topic:"Spring Boot Internals",     tasks:["Auto-configuration – @EnableAutoConfiguration, conditions","Spring Boot startup sequence – refresh, bean lifecycle","@Transactional – propagation, isolation, pitfalls"]},
+  {topic:"Spring – AOP",              tasks:["AOP concepts – advice, pointcut, joinpoint, weaving","AspectJ vs Spring AOP – proxy limitations","Use cases – logging, security, transactions"]},
+  {topic:"Java Deep Dives",           tasks:["HashMap vs ConcurrentHashMap – interview deep dive","String pool, interning, StringBuilder vs StringBuffer","Java memory model – happens-before, race conditions"]},
+  {topic:"Java Practice",             tasks:["Implement custom thread-safe LRU cache","Write producer-consumer using BlockingQueue","Solve 5 Java concurrency puzzles timed"]},
 ];
 
 const GO_TOPICS = [
-  "Goroutines: lightweight threads, M:N scheduling, goroutine leak prevention",
-  "Channels: buffered vs unbuffered, directional types, select with default",
-  "Context: cancellation propagation, deadlines, WithValue (avoid overuse)",
-  "sync.WaitGroup & sync.Mutex: coordinating goroutines, critical sections",
-  "Interfaces: implicit satisfaction, empty interface, type assertions, embedding",
-  "Go Scheduler: G-M-P model, preemption at safepoints, GOMAXPROCS",
-  "Memory Model: happens-before in Go, atomic operations, sync/atomic package",
-  "Escape Analysis: stack vs heap allocation, benchmarking allocations (-gcflags)",
-  "Error Handling: errors.Is/As, wrapping with %w, sentinel errors vs types",
-  "Profiling: pprof CPU/memory/goroutine profiles, trace tool, benchmark flags",
-  "Go Concurrency Patterns: worker pools, fan-out/fan-in, pipeline, semaphore",
+  {topic:"Go Fundamentals",           tasks:["Go modules, go.mod, go.sum – project setup","Types, interfaces, embedding – composition model","Error handling – errors.Is, errors.As, wrapping"]},
+  {topic:"Goroutines",                tasks:["Goroutines vs OS threads – M:N scheduling model","Go scheduler – GOMAXPROCS, P, M, G model","Goroutine leaks – context cancellation patterns"]},
+  {topic:"Channels",                  tasks:["Buffered vs unbuffered channels – blocking semantics","Select statement – non-blocking, timeout, done channel","Channel directions – send-only, receive-only in signatures"]},
+  {topic:"Concurrency Patterns",      tasks:["Worker pool pattern – bounded parallelism","Fan-out, fan-in – scatter/gather","Pipeline pattern – chained channel stages"]},
+  {topic:"Concurrency Patterns II",   tasks:["Context – cancellation, deadline, value propagation","sync.WaitGroup – coordinating goroutine completion","sync.Once, sync.Pool – lazy init & object reuse"]},
+  {topic:"Memory & Runtime",          tasks:["Escape analysis – stack vs heap, go build -gcflags","GC – tri-color mark-and-sweep, GOGC tuning","Memory alignment, struct padding, unsafe overview"]},
+  {topic:"Sync Primitives",           tasks:["sync.Mutex vs sync.RWMutex","sync.Map – concurrent map without external locking","atomic package – lock-free operations"]},
+  {topic:"Go Backend – REST",         tasks:["net/http – handlers, mux, middleware chaining","JSON marshaling – struct tags, custom marshalers","Middleware – auth, logging, rate limiting"]},
+  {topic:"Go Backend – gRPC",         tasks:["Protobuf schema design – messages, services, enums","gRPC streaming – server, client, bidirectional","gRPC interceptors – auth, tracing, retry"]},
+  {topic:"Go Production",             tasks:["Profiling – pprof CPU, memory, goroutine, block","Race detector – go test -race, detecting races","Observability – slog, prometheus, traces"]},
+  {topic:"Go Deep Dive",              tasks:["Go memory model – happens-before in channels & mutexes","Interface internals – itab, dynamic dispatch cost","Reflection – reflect.Type, Value, use cases & pitfalls"]},
+  {topic:"Go Practice",               tasks:["Implement concurrent web crawler with goroutines","Write token bucket rate limiter with goroutines","Implement fan-out worker pool for parallel processing"]},
 ];
 
-const BACKEND_TOPICS = [
-  "REST Design: resource naming, HTTP verbs, status codes, HATEOAS, pagination",
-  "gRPC: protobuf wire format, streaming types, interceptors, deadlines",
-  "Idempotency: safe + idempotent methods, idempotency keys, dedup window",
-  "Retries: exponential backoff, jitter, retry budgets, idempotency requirement",
-  "Circuit Breakers: closed/open/half-open states, failure thresholds, Hystrix/Resilience4j",
-  "Rate Limiting: token bucket, leaky bucket, sliding window — backend implementation",
-  "Distributed Caching: cache-aside in service layer, read/write patterns, invalidation",
-  "Kafka Producer/Consumer: at-least-once vs exactly-once, offset management",
-  "Event-Driven Architecture: event schema design, schema registry, event versioning",
-  "Observability: RED method (rate/errors/duration), structured logging, trace context",
-  "Distributed Locks: use cases, Redis SETNX + Lua, lock expiry, fencing tokens",
-];
-
-const BEHAVIORAL = [
-  { topic: "Leadership & Influence Without Authority",    prompt: "Tell me about a time you led a technical initiative without being the manager. How did you get buy-in?" },
-  { topic: "Ownership & Delivering Under Constraints",   prompt: "Describe a project where you had to deliver with limited resources or time. What trade-offs did you make?" },
-  { topic: "Conflict Resolution",                        prompt: "Tell me about a technical disagreement with a peer. How did you resolve it?" },
-  { topic: "Failure, Learning & Recovery",               prompt: "Describe a significant production incident or project failure. What was your role and what did you learn?" },
-  { topic: "Mentoring & Growing Others",                 prompt: "How have you helped a junior engineer grow? Give a specific example with measurable outcomes." },
-  { topic: "Architecture Decisions & Trade-offs",        prompt: "Walk me through the most significant architectural decision you made. What alternatives did you consider?" },
-  { topic: "Stakeholder Management",                     prompt: "Tell me about a time you had to manage conflicting priorities from multiple stakeholders." },
-  { topic: "Navigating Ambiguity",                       prompt: "Describe a project with unclear requirements. How did you bring clarity and drive execution?" },
-  { topic: "Cross-functional Collaboration",             prompt: "Give an example of working with non-technical teams (product, design, data). What made it successful?" },
-  { topic: "Prioritization Under Pressure",              prompt: "How do you decide what to work on when everything is urgent? Give a specific example." },
-  { topic: "Production Incident & On-call",              prompt: "Walk me through a major on-call incident. How did you diagnose, mitigate, and do postmortem?" },
-];
-
-const MOCKS = [
-  { date: new Date(2026,6,12), label: "Mock 1 — DSA Sprint",         type: "DSA"     },
-  { date: new Date(2026,6,26), label: "Mock 2 — DSA + HLD",          type: "DSA+HLD" },
-  { date: new Date(2026,7, 9), label: "Mock 3 — Full Loop",          type: "Full"    },
-  { date: new Date(2026,7,16), label: "Mock 4 — Full Loop",          type: "Full"    },
-  { date: new Date(2026,7,23), label: "Mock 5 — Full Loop",          type: "Full"    },
-  { date: new Date(2026,7,30), label: "Mock 6 — Final Loop",         type: "Full"    },
-];
-
-// ════════════════════════════════════════════════════════════
-// CURRICULUM GENERATION
-// ════════════════════════════════════════════════════════════
-
-function buildCurriculum() {
+function generatePlan() {
   const weeks = [];
+  let dsaI=0, lldI=0, hldI=0, javaI=0, goI=0;
+  const weekSec = ["LLD","HLD","Java","Go","LLD","HLD","Java","Go","LLD","HLD"];
+  const mockWks = new Set([4,6,8,10]);
+  let cur = new Date(START_DATE);
+  let wn = 0;
 
-  const javaPool  = [...JAVA_TOPICS];
-  const goPool    = [...GO_TOPICS];
-  const bePool    = [...BACKEND_TOPICS];
-  let behIdx = 0;
-
-  for (let wk = 1; wk <= 11; wk++) {
-    const wkStart = addDays(START, (wk-1)*7);
-    const wkEnd   = addDays(wkStart, 6);
-    const dsa     = DSA[wk];
-    const hld     = HLD[wk];
-    const lld     = LLD[wk];
-    const prevDsa = wk > 1 ? DSA[wk-1] : null;
-    const prevHld = wk > 1 ? HLD[wk-1] : null;
-    const prevLld = wk > 1 ? LLD[wk-1] : null;
-    const oldDsa  = wk > 3 ? DSA[wk-3] : null;
-    const ancDsa  = wk > 6 ? DSA[wk-6] : null;
-    // Extra DSA patterns woven into late weeks
-    const extraDsaMap = { 8: DSA[12], 9: DSA[13], 10: DSA[14], 11: DSA[12] }; // Adv Graphs, 2D DP, Arrays, Adv Graphs revisit
-    const extraDsa = extraDsaMap[wk] || null;
-
-    const mockToday = MOCKS.find(m => {
-      const sat = addDays(wkStart, 5);
-      return m.date.toDateString() === sat.toDateString();
-    });
-
+  while (cur <= END_DATE) {
+    wn++;
+    const wStart = new Date(cur);
+    const sec = weekSec[(wn-1) % weekSec.length];
     const days = [];
-    for (let d = 0; d < 7; d++) {
-      const date    = addDays(wkStart, d);
-      const dayName = date.toLocaleDateString("en-US",{weekday:"long"});
-      const dayKey  = `w${wk}_d${d+1}`;
 
-      const javaItem  = javaPool.shift(); if (javaItem)  javaPool.push(javaItem);
-      const goItem    = goPool.shift();   if (goItem)    goPool.push(goItem);
-      const beItem    = bePool.shift();   if (beItem)    bePool.push(beItem);
+    for (let d=0; d<7; d++) {
+      if (cur > END_DATE) break;
+      const date = new Date(cur);
+      const isRev = d === 6;
+      const isMockDay = mockWks.has(wn) && d === 5;
 
-      const tasks = [];
-
-      // ── DSA ──────────────────────────────────────────────
-      if (d < 5) {
-        const probs  = dsa.mustSolve;
-        const chunk  = Math.ceil(probs.length / 5);
-        const slice  = probs.slice(d * chunk, (d+1) * chunk).slice(0, 3);
-        tasks.push({
-          id: `${dayKey}_dsa`, category: "DSA",
-          title: `DSA — ${dsa.pattern}`,
-          items: [
-            { id:`${dayKey}_dsa_theory`, text:`Study theory: ${dsa.theory[d % dsa.theory.length]}`, priority:"High",   estimatedMin: 30 },
-            ...slice.map((p,i) => ({ id:`${dayKey}_dsa_p${i}`, text:`Solve: ${p}`, priority: i===0?"Critical":"High", estimatedMin: 40 })),
-          ],
+      if (isRev) {
+        days.push({ date, dateStr:fmt(date), dateShort:fmtS(date), dayName:dayName(date), isWeekend:true, isRevisionDay:true,
+          sections: {
+            dsa:  { topic:"DSA Revision & Mock", tasks:["Revisit weak DSA topics from this week","Re-solve 2-3 previously marked problems","Timed mock: 1 medium + 1 hard problem","Review notes & update revision list"] },
+            secondary: { subject:sec, topic:"Weekly Revision", tasks:[`Review ${sec} notes from this week`,`Re-read key ${sec} concepts`,`Practice 1 ${sec} problem/question`,"Mock: pick a random past topic"] },
+          }
         });
-      }
-
-      // ── Extra DSA Pattern (wks 8-11: weave in Bit Manip / Adv Graphs / 2D DP / Arrays) ──
-      if (extraDsa && (d === 2 || d === 4)) {
-        const eProbs = extraDsa.mustSolve;
-        const eSlice = d === 2 ? eProbs.slice(0, 2) : eProbs.slice(2, 4);
-        tasks.push({
-          id:`${dayKey}_dsa_extra`, category:"DSA",
-          title:`DSA Bonus — ${extraDsa.pattern}`,
-          items: [
-            { id:`${dayKey}_dsa_extra_t`, text:`Theory: ${extraDsa.theory[d===2?0:1]}`, priority:"High", estimatedMin:25 },
-            ...eSlice.map((p,i) => ({ id:`${dayKey}_dsa_extra_p${i}`, text:`Solve: ${p}`, priority:"High", estimatedMin:35 })),
-          ],
+      } else if (isMockDay) {
+        days.push({ date, dateStr:fmt(date), dateShort:fmtS(date), dayName:dayName(date), isWeekend:true, isMockDay:true,
+          sections: {
+            dsa:  { topic:"DSA Mock Interview", tasks:["Timed mock: 2 medium problems (45 min each)","Hard problem attempt (60 min)","Review all solutions & optimize"] },
+            secondary: { subject:sec, topic:`${sec} Mock Interview`,
+              tasks:[
+                sec==="LLD"?"LLD mock: design system in 45 min":
+                sec==="HLD"?"HLD mock: system design in 45 min":
+                sec==="Java"?"Java deep-dive mock Q&A (60 min)":
+                "Go concurrency mock coding (60 min)",
+                "Review & self-evaluate","Behavioral + technical combined mock"
+              ]
+            },
+          }
         });
-      }
-
-      // ── HLD (Mon/Thu) ─────────────────────────────────────
-      if (d === 0) {
-        tasks.push({
-          id:`${dayKey}_hld`, category:"HLD", title:`HLD Theory — ${hld.topic}`,
-          items: [
-            { id:`${dayKey}_hld_t0`, text:`Theory: ${hld.theory[0]}`, priority:"High", estimatedMin:40 },
-            { id:`${dayKey}_hld_t1`, text:`Theory: ${hld.theory[1]}`, priority:"High", estimatedMin:40 },
-            { id:`${dayKey}_hld_read`, text:`Reading: ${hld.readingLinks[0]}`, priority:"Medium", estimatedMin:20 },
-          ],
+      } else {
+        const dst = DSA_TOPICS[dsaI % DSA_TOPICS.length];
+        let st;
+        if      (sec==="LLD")  { st=LLD_TOPICS[lldI  % LLD_TOPICS.length];  lldI++;  }
+        else if (sec==="HLD")  { st=HLD_TOPICS[hldI  % HLD_TOPICS.length];  hldI++;  }
+        else if (sec==="Java") { st=JAVA_TOPICS[javaI % JAVA_TOPICS.length]; javaI++; }
+        else                   { st=GO_TOPICS[goI    % GO_TOPICS.length];    goI++;   }
+        const tasks = isWknd(date) ? [...dst.tasks,"Extra: explore a harder variant"] : dst.tasks;
+        days.push({ date, dateStr:fmt(date), dateShort:fmtS(date), dayName:dayName(date), isWeekend:isWknd(date),
+          sections: {
+            dsa:      { topic:dst.topic, tasks },
+            secondary:{ subject:sec, topic:st.topic, tasks:st.tasks },
+          }
         });
+        dsaI++;
       }
-      if (d === 3) {
-        tasks.push({
-          id:`${dayKey}_hld2`, category:"HLD", title:`HLD Design — ${hld.question}`,
-          items: [
-            { id:`${dayKey}_hld2_q`,  text:`Design: ${hld.question}`, priority:"Critical", estimatedMin:60 },
-            { id:`${dayKey}_hld2_t0`, text:`Deep dive: ${hld.theory[2] || hld.theory[0]}`, priority:"High", estimatedMin:30 },
-            { id:`${dayKey}_hld2_tr`, text:`Discuss trade-offs: ${hld.tradeoffs[0]}`, priority:"High", estimatedMin:20 },
-          ],
-        });
-      }
-
-      // ── LLD (Tue/Fri) ─────────────────────────────────────
-      if (d === 1) {
-        tasks.push({
-          id:`${dayKey}_lld`, category:"LLD", title:`LLD Theory — ${lld.topic}`,
-          items: [
-            { id:`${dayKey}_lld_t0`, text:`Theory: ${lld.theory[0]}`, priority:"High", estimatedMin:40 },
-            { id:`${dayKey}_lld_t1`, text:`Theory: ${lld.theory[1]}`, priority:"High", estimatedMin:40 },
-          ],
-        });
-      }
-      if (d === 4) {
-        tasks.push({
-          id:`${dayKey}_lld2`, category:"LLD", title:`LLD Practice — ${lld.question}`,
-          items: [
-            { id:`${dayKey}_lld2_q`, text:`Code: ${lld.question}`, priority:"Critical", estimatedMin: lld.machineCode ? 90 : 60 },
-            { id:`${dayKey}_lld2_t`, text:`Review: ${lld.theory[2] || lld.theory[0]}`, priority:"Medium", estimatedMin:20 },
-          ],
-        });
-      }
-
-      // ── Behavioral (Wed) ──────────────────────────────────
-      if (d === 2) {
-        const beh = BEHAVIORAL[behIdx % BEHAVIORAL.length]; behIdx++;
-        tasks.push({
-          id:`${dayKey}_beh`, category:"Behavioral", title:`Behavioral — ${beh.topic}`,
-          items: [
-            { id:`${dayKey}_beh_0`, text:`Draft STAR story: ${beh.prompt}`, priority:"High", estimatedMin:45 },
-            { id:`${dayKey}_beh_1`, text:"Deliver story aloud × 2 (record if possible)", priority:"Medium", estimatedMin:20 },
-            { id:`${dayKey}_beh_2`, text:"Score: S-T-A-R clarity, engineering impact, numbers", priority:"Medium", estimatedMin:10 },
-          ],
-        });
-      }
-
-      // ── Java / Go / Backend ───────────────────────────────
-      if ((d === 0 || d === 3) && javaItem) {
-        tasks.push({
-          id:`${dayKey}_java`, category:"Java",
-          title:`Java Backend — ${javaItem.split(":")[0]}`,
-          items:[{ id:`${dayKey}_java_0`, text:javaItem, priority:"Medium", estimatedMin:30 }],
-        });
-      }
-      if ((d === 1 || d === 4) && goItem) {
-        tasks.push({
-          id:`${dayKey}_go`, category:"Go",
-          title:`Go Backend — ${goItem.split(":")[0]}`,
-          items:[{ id:`${dayKey}_go_0`, text:goItem, priority:"Medium", estimatedMin:30 }],
-        });
-      }
-      if (d === 2 && beItem) {
-        tasks.push({
-          id:`${dayKey}_be`, category:"Backend",
-          title:`Backend Engineering — ${beItem.split(":")[0]}`,
-          items:[{ id:`${dayKey}_be_0`, text:beItem, priority:"Medium", estimatedMin:25 }],
-        });
-      }
-
-      // ── Saturday: Mock or HLD Design ─────────────────────
-      if (d === 5) {
-        if (mockToday) {
-          tasks.push({
-            id:`${dayKey}_mock`, category:"Mock", title:`🎯 ${mockToday.label}`,
-            items: [
-              { id:`${dayKey}_mock_0`, text:"1× Medium DSA — 25 min timed, no hints", priority:"Critical", estimatedMin:25 },
-              { id:`${dayKey}_mock_1`, text:"1× Hard DSA — 40 min timed", priority:"Critical", estimatedMin:40 },
-              ...(mockToday.type !== "DSA" ? [
-                { id:`${dayKey}_mock_2`, text:`HLD: ${hld.question} — 45 min, full design`, priority:"Critical", estimatedMin:45 },
-              ] : []),
-              ...(mockToday.type === "Full" ? [
-                { id:`${dayKey}_mock_3`, text:`Behavioral: present one STAR story`, priority:"High", estimatedMin:20 },
-                { id:`${dayKey}_mock_4`, text:`LLD: 30 min design question`, priority:"High", estimatedMin:30 },
-              ] : []),
-              { id:`${dayKey}_mock_5`, text:"Log: score, weak spots, notes (use Mock Tracker)", priority:"High", estimatedMin:15 },
-            ],
-          });
-        } else {
-          tasks.push({
-            id:`${dayKey}_hld_deep`, category:"HLD", title:`System Design Deep Dive`,
-            items:[
-              { id:`${dayKey}_hld_deep_0`, text:`Full 45-min design: ${hld.question}`, priority:"Critical", estimatedMin:45 },
-              { id:`${dayKey}_hld_deep_1`, text:`Theory recap: ${hld.theory[hld.theory.length-1]}`, priority:"High", estimatedMin:30 },
-              { id:`${dayKey}_hld_deep_2`, text:`Trade-offs: ${hld.tradeoffs[hld.tradeoffs.length-1]}`, priority:"Medium", estimatedMin:20 },
-            ],
-          });
-          tasks.push({
-            id:`${dayKey}_lld_sat`, category:"LLD", title:`LLD Practice Sprint`,
-            items:[
-              { id:`${dayKey}_lld_sat_0`, text:`Code sprint: ${lld.question}`, priority:"High", estimatedMin:60 },
-            ],
-          });
-        }
-      }
-
-      // ── Sunday: Revision ──────────────────────────────────
-      if (d === 6) {
-        const revItems = [
-          prevDsa  && { id:`${dayKey}_rev_0`, text:`Re-solve (no hints): ${prevDsa.mustSolve[0]}`, priority:"Critical", estimatedMin:35 },
-          prevDsa  && { id:`${dayKey}_rev_1`, text:`Re-solve: ${prevDsa.mustSolve[1] || prevDsa.mustSolve[0]}`, priority:"High", estimatedMin:35 },
-          oldDsa   && { id:`${dayKey}_rev_2`, text:`Spaced review (3wk): ${oldDsa.mustSolve[0]}`, priority:"High", estimatedMin:30 },
-          ancDsa   && { id:`${dayKey}_rev_3`, text:`Long-term review (6wk): ${ancDsa.mustSolve[0]}`, priority:"Medium", estimatedMin:25 },
-          prevHld  && { id:`${dayKey}_rev_4`, text:`HLD recap: ${prevHld.topic.split(":")[0]}`, priority:"Medium", estimatedMin:30 },
-          prevLld  && { id:`${dayKey}_rev_5`, text:`LLD recap: ${prevLld.topic.split(":")[0]}`, priority:"Medium", estimatedMin:20 },
-                       { id:`${dayKey}_rev_6`, text:"Rehearse this week's STAR story aloud", priority:"Low", estimatedMin:15 },
-          !prevDsa && { id:`${dayKey}_rev_7`, text:"Review Week 1 patterns from memory — write templates", priority:"High", estimatedMin:40 },
-        ].filter(Boolean);
-        tasks.push({
-          id:`${dayKey}_rev`, category:"Revision", title:"Revision Day",
-          items: revItems,
-        });
-      }
-
-      const totalMin = tasks.reduce((s,t) => s + t.items.reduce((ss,i) => ss + i.estimatedMin, 0), 0);
-      days.push({
-        dayKey, date, dateStr: fmtDay(date), dayName,
-        weekNum: wk, dayNum: d+1, tasks,
-        totalItems: tasks.reduce((s,t)=>s+t.items.length,0),
-        estimatedMinutes: totalMin,
-      });
+      cur = addDays(cur, 1);
     }
 
-    weeks.push({
-      weekNum: wk, label: `Week ${wk}`,
-      range: `${fmtShort(wkStart)} – ${fmtShort(wkEnd)}`,
-      start: wkStart, end: wkEnd,
-      goals: [
-        `DSA: ${dsa.pattern}`,
-        `HLD: ${hld.topic.split(":")[0].split(",")[0].trim()}`,
-        `LLD: ${lld.topic.split(":")[0].trim()}`,
-        `Behavioral: ${BEHAVIORAL[(wk-1) % BEHAVIORAL.length].topic}`,
-      ],
-      days,
-      totalItems: days.reduce((s,d)=>s+d.totalItems,0),
-    });
+    const wEnd = new Date(cur); wEnd.setDate(wEnd.getDate()-1);
+    weeks.push({ weekNum:wn, startDate:wStart, endDate:wEnd<=END_DATE?wEnd:new Date(END_DATE), secondary:sec, isMockWeek:mockWks.has(wn), days });
   }
   return weeks;
 }
 
-const CURRICULUM = buildCurriculum();
-
-// ════════════════════════════════════════════════════════════
-// PERSISTENCE HOOK
-// ════════════════════════════════════════════════════════════
-
-const STORAGE_KEY = "iptOS_v3";
-const EMPTY_STATE = { completedTasks:{}, notes:{}, mockScores:{}, readinessScore:{}, revisions:{}, lastUpdated:"" };
-
-function useLocalStorage() {
-  const [state, setStateRaw] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? { ...EMPTY_STATE, ...JSON.parse(raw) } : { ...EMPTY_STATE };
-    } catch { return { ...EMPTY_STATE }; }
-  });
-
-  const setState = useCallback((updater) => {
-    setStateRaw(prev => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      const withTs = { ...next, lastUpdated: new Date().toISOString() };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(withTs)); } catch {}
-      return withTs;
-    });
-  }, []);
-
-  const toggleTask = useCallback((id) => {
-    setState(prev => ({
-      ...prev,
-      completedTasks: {
-        ...prev.completedTasks,
-        [id]: prev.completedTasks[id] ? null : new Date().toISOString(),
-      },
-    }));
-  }, [setState]);
-
-  const setNote = useCallback((key, val) => {
-    setState(prev => ({ ...prev, notes: { ...prev.notes, [key]: val } }));
-  }, [setState]);
-
-  const setMockScore = useCallback((key, val) => {
-    setState(prev => ({ ...prev, mockScores: { ...prev.mockScores, [key]: val } }));
-  }, [setState]);
-
-  const resetAll = useCallback(() => {
-    const fresh = { ...EMPTY_STATE };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh)); } catch {}
-    setStateRaw(fresh);
-  }, []);
-
-  return { state, toggleTask, setNote, setMockScore, resetAll, setState };
-}
-
-// ════════════════════════════════════════════════════════════
-// ANALYTICS
-// ════════════════════════════════════════════════════════════
-
-function calcProgress(state) {
-  const cats = {};
-  Object.keys(CAT_META).forEach(k => { cats[k] = { done:0, total:0 }; });
-  let total = 0, done = 0;
-
-  CURRICULUM.forEach(wk => wk.days.forEach(day => day.tasks.forEach(task => {
-    const cat = task.category;
-    task.items.forEach(item => {
-      total++;
-      if (cats[cat]) cats[cat].total++;
-      if (state.completedTasks[item.id]) {
-        done++;
-        if (cats[cat]) cats[cat].done++;
+// Assign stable IDs
+function withIds(plan) {
+  return plan.map((week,wi) => ({
+    ...week,
+    days: week.days.map((day,di) => ({
+      ...day,
+      sections: {
+        dsa:      { ...day.sections.dsa,      tasks: day.sections.dsa.tasks.map((t,ti)     =>({id:`w${wi}d${di}a${ti}`,text:t})) },
+        secondary:{ ...day.sections.secondary, tasks: day.sections.secondary.tasks.map((t,ti)=>({id:`w${wi}d${di}b${ti}`,text:t})) },
       }
-    });
-  })));
-
-  const pct = c => c.total ? Math.round(c.done / c.total * 100) : 0;
-  return {
-    overall: total ? Math.round(done / total * 100) : 0,
-    DSA: pct(cats.DSA), HLD: pct(cats.HLD), LLD: pct(cats.LLD),
-    Java: pct(cats.Java), Go: pct(cats.Go), Backend: pct(cats.Backend),
-    Behavioral: pct(cats.Behavioral), Revision: pct(cats.Revision), Mock: pct(cats.Mock),
-    totals: cats, done, total,
-  };
+    }))
+  }));
 }
 
-function calcReadiness(prog) {
-  return Math.round(prog.DSA * 0.40 + prog.HLD * 0.25 + prog.LLD * 0.15 +
-    ((prog.Java + prog.Go + prog.Backend) / 3) * 0.10 + prog.Behavioral * 0.10);
+const PLAN = withIds(generatePlan());
+
+// ============================================================
+// STORAGE
+// ============================================================
+const LS = { tasks:"itrk_t3", notes:"itrk_n3", flags:"itrk_f3" };
+const load = (k,fb) => { try { return JSON.parse(localStorage.getItem(k))??fb; } catch { return fb; } };
+const save = (k,v)  => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} };
+
+// ============================================================
+// STATS
+// ============================================================
+function cntTasks(day)       { return day.sections.dsa.tasks.length + day.sections.secondary.tasks.length; }
+function donInDay(day,done)  { return [...day.sections.dsa.tasks,...day.sections.secondary.tasks].filter(t=>done[t.id]).length; }
+function wkPct(week,done)    { let t=0,d=0; week.days.forEach(day=>{t+=cntTasks(day);d+=donInDay(day,done);}); return t?Math.round(d/t*100):0; }
+function subjPct(key,done)   {
+  let t=0,d=0;
+  PLAN.forEach(week=>week.days.forEach(day=>{
+    const arr = key==="dsa" ? day.sections.dsa.tasks : (day.sections.secondary.subject?.toLowerCase()===key ? day.sections.secondary.tasks : []);
+    arr.forEach(tk=>{ t++; if(done[tk.id]) d++; });
+  }));
+  return t?Math.round(d/t*100):0;
+}
+function totalPct(done) {
+  let t=0,d=0;
+  PLAN.forEach(w=>w.days.forEach(day=>{t+=cntTasks(day);d+=donInDay(day,done);}));
+  return t?Math.round(d/t*100):0;
+}
+function dayStats() {
+  const today=new Date(); today.setHours(0,0,0,0);
+  const start=new Date(START_DATE); start.setHours(0,0,0,0);
+  const end=new Date(END_DATE); end.setHours(0,0,0,0);
+  const total=Math.ceil((end-start)/86400000)+1;
+  const comp=Math.max(0,Math.min(Math.ceil((today-start)/86400000),total));
+  const rem=Math.max(0,Math.ceil((end-today)/86400000));
+  return {total,comp,rem};
+}
+function curWeekNum() {
+  const t=new Date();
+  for(let i=0;i<PLAN.length;i++) if(t>=PLAN[i].startDate&&t<=PLAN[i].endDate) return i+1;
+  return t<PLAN[0].startDate?1:PLAN.length;
 }
 
-function calcStreak(state) {
-  let streak = 0;
-  const today = new Date(); today.setHours(0,0,0,0);
-  for (let i = 0; i < 120; i++) {
-    const d = addDays(today, -i);
-    const ds = d.toDateString();
-    const hit = Object.values(state.completedTasks).some(ts => ts && new Date(ts).toDateString() === ds);
-    if (hit) streak++;
-    else if (i > 0) break;
-  }
-  return streak;
-}
-
-function daysRemaining() {
-  return Math.max(0, Math.ceil((END - new Date()) / 86400000));
-}
-
-function getCurrentWeek() {
-  for (let i = 0; i < CURRICULUM.length; i++) {
-    if (TODAY >= CURRICULUM[i].start && TODAY <= CURRICULUM[i].end) return i+1;
-  }
-  return TODAY < START ? 1 : 11;
-}
-
-// ════════════════════════════════════════════════════════════
+// ============================================================
 // UI PRIMITIVES
-// ════════════════════════════════════════════════════════════
-
-function ProgressBar({ value, colorClass = "bg-emerald-500", size = "md" }) {
-  const h = size === "sm" ? "h-1" : size === "lg" ? "h-3" : "h-1.5";
+// ============================================================
+function Card({children, style={}, onClick}) {
   return (
-    <div className={`w-full ${h} bg-slate-800 rounded-full overflow-hidden`}>
-      <div className={`${h} ${colorClass} rounded-full transition-all duration-500`} style={{width:`${Math.min(100,value)}%`}} />
+    <div onClick={onClick} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:20,cursor:onClick?"pointer":undefined,...style}}>
+      {children}
     </div>
   );
 }
 
-function CatBadge({ category, small }) {
-  const m = CAT_META[category] || CAT_META.DSA;
+function Bar({pct, color, height=8}) {
   return (
-    <span className={`${small ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5"} rounded-full font-medium ${m.badge}`}>
-      {m.label}
+    <div style={{background:"rgba(255,255,255,0.07)",borderRadius:99,height,overflow:"hidden",width:"100%"}}>
+      <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:99,transition:"width 0.7s ease"}}/>
+    </div>
+  );
+}
+
+function Chip({label,cfg}) {
+  return (
+    <span style={{background:cfg.bg,color:cfg.textColor,border:`1px solid ${cfg.color}22`,borderRadius:99,fontSize:11,fontWeight:700,padding:"2px 8px",display:"inline-flex",alignItems:"center"}}>
+      {label}
     </span>
   );
 }
 
-function PriorityDot({ priority }) {
-  const m = PRIORITY_META[priority] || PRIORITY_META.Medium;
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${m.dot} flex-shrink-0 mt-1.5`} />;
-}
-
-function ReadinessGauge({ score }) {
-  const r = 32, circ = 2 * Math.PI * r;
-  const color = score >= 80 ? "#10b981" : score >= 50 ? "#eab308" : "#ef4444";
-  const offset = circ - (score / 100) * circ;
-  const label = score >= 80 ? "Interview Ready 🟢" : score >= 50 ? "On Track 🟡" : "Build Foundations 🔴";
+function CheckItem({task,done,onToggle}) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width="88" height="88" viewBox="0 0 88 88" className="-rotate-90">
-        <circle cx="44" cy="44" r={r} fill="none" strokeWidth="7" stroke="#1e293b" />
-        <circle cx="44" cy="44" r={r} fill="none" strokeWidth="7"
-          stroke={color} strokeDasharray={circ} strokeDashoffset={offset}
-          strokeLinecap="round" />
-      </svg>
-      <div className="text-xl font-bold -mt-[72px] mb-[48px]" style={{color}}>{score}%</div>
-      <div className="text-xs text-slate-400 text-center leading-tight">{label}</div>
+    <div onClick={onToggle} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"7px 0",cursor:"pointer"}}>
+      <div style={{
+        marginTop:2,flexShrink:0,width:18,height:18,borderRadius:5,
+        border:`2px solid ${done?T.indigo:"#3a3a5a"}`,
+        background:done?T.indigo:"transparent",
+        display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"
+      }}>
+        {done && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
+      </div>
+      <span style={{fontSize:13,lineHeight:1.5,color:done?"#404060":"#b0b0d0",textDecoration:done?"line-through":"none",transition:"all 0.15s"}}>
+        {task.text}
+      </span>
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// TASK ITEM
-// ════════════════════════════════════════════════════════════
-
-function TaskItem({ item, state, onToggle, onNote }) {
-  const [noteOpen, setNoteOpen] = useState(false);
-  const checked = !!state.completedTasks[item.id];
-  const noteKey = `note_${item.id}`;
-  const note = state.notes[noteKey] || "";
-  const m = PRIORITY_META[item.priority] || PRIORITY_META.Medium;
-
-  return (
-    <div className={`group transition-all ${checked ? "opacity-55" : ""}`}>
-      <div className="flex items-start gap-2.5 py-1.5 px-3 rounded-lg hover:bg-slate-800/40 transition-colors">
-        <button onClick={() => onToggle(item.id)} className="mt-0.5 flex-shrink-0 focus:outline-none">
-          {checked
-            ? <CheckCircle2 size={15} className="text-emerald-500" />
-            : <Circle size={15} className="text-slate-700 group-hover:text-slate-500 transition-colors" />}
-        </button>
-        <PriorityDot priority={item.priority} />
-        <div className="flex-1 min-w-0">
-          <span className={`text-sm leading-snug ${checked ? "line-through text-slate-600" : "text-slate-200"}`}>
-            {item.text}
-          </span>
-          {noteOpen && (
-            <textarea
-              className="mt-1.5 w-full bg-slate-800/80 border border-slate-700/60 rounded-md p-2 text-xs text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-slate-600 font-mono"
-              rows={2}
-              placeholder="Notes, links, insights..."
-              value={note}
-              onChange={e => onNote(noteKey, e.target.value)}
-            />
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => setNoteOpen(!noteOpen)} className="text-slate-600 hover:text-slate-400">
-            <FileText size={12} />
-          </button>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className={`text-[10px] font-medium ${m.text} hidden sm:block`}>{item.priority}</span>
-          <span className="text-[10px] text-slate-700 flex items-center gap-0.5"><Clock size={9}/>{item.estimatedMin}m</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// TASK GROUP
-// ════════════════════════════════════════════════════════════
-
-function TaskGroup({ task, state, onToggle, onNote }) {
-  const m = CAT_META[task.category] || CAT_META.DSA;
-  const Icon = m.icon;
-  const done = task.items.filter(i => state.completedTasks[i.id]).length;
-  const total = task.items.length;
+// ============================================================
+// OVERVIEW
+// ============================================================
+function Overview({done, onNav}) {
+  const pct = totalPct(done);
+  const {comp,rem} = dayStats();
+  const cw = curWeekNum();
+  const R = 52, C = 2*Math.PI*R;
+  const subjects = [
+    {key:"dsa",...SUBJ.dsa},{key:"lld",...SUBJ.lld},{key:"hld",...SUBJ.hld},{key:"java",...SUBJ.java},{key:"go",...SUBJ.go}
+  ];
 
   return (
-    <div className={`rounded-xl border ${m.border} ${m.bg} overflow-hidden mb-2`}>
-      <div className={`flex items-center gap-2 px-3 py-2 border-b ${m.border}`}>
-        <Icon size={13} className={m.text} />
-        <span className={`text-xs font-semibold ${m.text} flex-1`}>{task.title}</span>
-        <span className="text-xs text-slate-600">{done}/{total}</span>
-        {done === total && total > 0 && <CheckCheck size={12} className="text-emerald-500" />}
-      </div>
-      {task.items.map(item => (
-        <TaskItem key={item.id} item={item} state={state} onToggle={onToggle} onNote={onNote} />
-      ))}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// DAY CARD
-// ════════════════════════════════════════════════════════════
-
-function DayCard({ day, state, onToggle, onNote, defaultOpen, noteKey }) {
-  const [open, setOpen] = useState(defaultOpen || false);
-  const isToday = day.date.toDateString() === TODAY.toDateString();
-  const done = day.tasks.reduce((s,t) => s + t.items.filter(i => state.completedTasks[i.id]).length, 0);
-  const total = day.totalItems;
-  const pct = total ? Math.round(done/total*100) : 0;
-  const [note, setNoteLocal] = useState(state.notes[`dayNote_${day.dayKey}`] || "");
-  const [noteOpen, setNoteOpen] = useState(false);
-  const cats = [...new Set(day.tasks.map(t => t.category))];
-
-  const handleNoteChange = (val) => {
-    setNoteLocal(val);
-    onNote(`dayNote_${day.dayKey}`, val);
-  };
-
-  return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${isToday ? "border-emerald-700/60 shadow-lg shadow-emerald-950/20" : "border-slate-800"} bg-slate-900`}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/20 transition-colors text-left"
-      >
-        <div className="flex-shrink-0">
-          {open ? <ChevronDown size={13} className="text-slate-600" /> : <ChevronRight size={13} className="text-slate-600" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-semibold ${isToday ? "text-emerald-400" : "text-slate-200"}`}>{day.dayName}</span>
-            <span className="text-xs text-slate-500">{day.dateStr}</span>
-            {isToday && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/40 font-medium">TODAY</span>}
-          </div>
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            {cats.map(c => <CatBadge key={c} category={c} small />)}
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {/* Ring */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"32px 0 16px"}}>
+        <div style={{position:"relative",width:144,height:144}}>
+          <svg width="144" height="144" viewBox="0 0 120 120" style={{transform:"rotate(-90deg)"}}>
+            <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="12"/>
+            <circle cx="60" cy="60" r={R} fill="none" stroke={T.indigo} strokeWidth="12"
+              strokeDasharray={C} strokeDashoffset={C*(1-pct/100)} strokeLinecap="round"
+              style={{transition:"stroke-dashoffset 1s ease"}}/>
+          </svg>
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:36,fontWeight:800,color:T.text,lineHeight:1}}>{pct}%</span>
+            <span style={{fontSize:11,color:T.textDim,marginTop:2}}>progress</span>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="text-right">
-            <div className="text-xs text-slate-500">{done}/{total}</div>
-            <div className={`text-xs font-bold ${pct===100?"text-emerald-400":"text-slate-500"}`}>{pct}%</div>
-          </div>
-          <div className="w-14 hidden sm:block">
-            <ProgressBar value={pct} colorClass={pct===100?"bg-emerald-500":"bg-blue-500"} />
-          </div>
-        </div>
-      </button>
-
-      {open && (
-        <div className="border-t border-slate-800 px-3 pb-3 pt-2">
-          <div className="flex items-center gap-3 mb-3 px-1">
-            <Clock size={11} className="text-slate-600" />
-            <span className="text-xs text-slate-600">Estimated: {(day.estimatedMinutes / 60).toFixed(1)}h</span>
-            <ProgressBar value={pct} colorClass={pct===100?"bg-emerald-500":"bg-blue-500"} size="sm" />
-            <span className="text-xs text-slate-600 flex-shrink-0">{pct}%</span>
-          </div>
-          {day.tasks.map(task => (
-            <TaskGroup key={task.id} task={task} state={state} onToggle={onToggle} onNote={onNote} />
-          ))}
-          <div className="mt-2">
-            <button
-              onClick={() => setNoteOpen(!noteOpen)}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition-colors mb-1"
-            >
-              <FileText size={11} />{noteOpen ? "Hide" : "Day notes"}
-            </button>
-            {noteOpen && (
-              <textarea
-                className="w-full bg-slate-800/70 border border-slate-700/50 rounded-lg p-2.5 text-xs text-slate-300 placeholder-slate-700 resize-none focus:outline-none focus:border-slate-600 font-mono"
-                rows={3}
-                placeholder="Daily reflection, blockers, key takeaways..."
-                value={note}
-                onChange={e => handleNoteChange(e.target.value)}
-              />
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// WEEK PAGE
-// ════════════════════════════════════════════════════════════
-
-function WeekPage({ weekNum, state, onToggle, onNote }) {
-  const week = CURRICULUM[weekNum - 1];
-  const done  = week.days.reduce((s,d) => s + d.tasks.reduce((ss,t) => ss + t.items.filter(i => state.completedTasks[i.id]).length, 0), 0);
-  const total = week.totalItems;
-  const pct   = total ? Math.round(done/total*100) : 0;
-  const curWeek = getCurrentWeek();
-  const wkDsa = DSA[weekNum];
-  const wkHld = HLD[weekNum];
-  const wkLld = LLD[weekNum];
-
-  return (
-    <div className="space-y-5">
-      {/* Week Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-slate-100">{week.label}</h2>
-              {weekNum === curWeek && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/40 font-medium">CURRENT</span>
-              )}
-            </div>
-            <p className="text-sm text-slate-400">{week.range}</p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <div className={`text-3xl font-bold ${pct===100?"text-emerald-400":"text-slate-100"}`}>{pct}%</div>
-            <div className="text-xs text-slate-500">{done}/{total} tasks</div>
-          </div>
-        </div>
-        <ProgressBar value={pct} colorClass={pct===100?"bg-emerald-500":"bg-blue-500"} size="lg" />
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          {week.goals.map((g,i) => (
-            <div key={i} className="flex items-start gap-2 text-xs text-slate-400">
-              <Target size={10} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-              <span>{g}</span>
-            </div>
-          ))}
-        </div>
+        <p style={{marginTop:12,fontSize:12,color:T.textDim,textAlign:"center"}}>Senior Backend Engineer · Jun 21 – Aug 31, 2026</p>
       </div>
 
-      {/* Topic cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="bg-slate-900 border border-blue-800/30 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Code2 size={13} className="text-blue-400" />
-            <span className="text-xs font-semibold text-blue-300">DSA Pattern</span>
-          </div>
-          <div className="text-sm text-slate-200 font-medium mb-2">{wkDsa.pattern}</div>
-          <div className="text-xs text-slate-500 leading-relaxed">{wkDsa.theory[0].slice(0,80)}…</div>
-        </div>
-        <div className="bg-slate-900 border border-purple-800/30 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Brain size={13} className="text-purple-400" />
-            <span className="text-xs font-semibold text-purple-300">HLD Topic</span>
-          </div>
-          <div className="text-sm text-slate-200 font-medium mb-2">{wkHld.topic.split(":")[0]}</div>
-          <div className="text-xs text-slate-500">{wkHld.question}</div>
-        </div>
-        <div className="bg-slate-900 border border-orange-800/30 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Layers size={13} className="text-orange-400" />
-            <span className="text-xs font-semibold text-orange-300">LLD Topic</span>
-          </div>
-          <div className="text-sm text-slate-200 font-medium mb-2">{wkLld.topic.split(":")[0].split(",")[0]}</div>
-          <div className="text-xs text-slate-500">{wkLld.machineCode ? "Machine Coding" : "Design Question"}</div>
-        </div>
-      </div>
-
-      {/* DSA Template */}
-      <details className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-slate-800/20 text-sm font-medium text-blue-300">
-          <Code2 size={13} />DSA Template — {wkDsa.pattern}
-        </summary>
-        <pre className="px-4 pb-4 text-xs text-slate-300 font-mono overflow-x-auto whitespace-pre leading-relaxed bg-slate-950/50 border-t border-slate-800">
-          {wkDsa.template}
-        </pre>
-      </details>
-
-      {/* Days */}
-      <div className="space-y-2">
-        {week.days.map(day => (
-          <DayCard
-            key={day.dayKey}
-            day={day}
-            state={state}
-            onToggle={onToggle}
-            onNote={onNote}
-            defaultOpen={day.date.toDateString() === TODAY.toDateString()}
-          />
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {[
+          {l:"Days Completed", v:comp, s:"since Jun 21"},
+          {l:"Days Remaining", v:rem,  s:"until Aug 31"},
+          {l:"Current Week",   v:`W${cw}`, s:"of 10 weeks"},
+          {l:"Overall",        v:`${pct}%`, s:"tasks done"},
+        ].map(s=>(
+          <Card key={s.l} style={{padding:16}}>
+            <p style={{fontSize:11,color:T.textDim,marginBottom:4}}>{s.l}</p>
+            <p style={{fontSize:26,fontWeight:800,color:T.text,margin:0}}>{s.v}</p>
+            <p style={{fontSize:11,color:T.textFaint,marginTop:2}}>{s.s}</p>
+          </Card>
         ))}
       </div>
-    </div>
-  );
-}
 
-// ════════════════════════════════════════════════════════════
-// DASHBOARD
-// ════════════════════════════════════════════════════════════
-
-function Dashboard({ state, onNavigate }) {
-  const prog     = useMemo(() => calcProgress(state), [state]);
-  const readiness = calcReadiness(prog);
-  const streak   = calcStreak(state);
-  const daysLeft = daysRemaining();
-  const curWeek  = getCurrentWeek();
-
-  // Revision due today
-  const revDue = useMemo(() => {
-    const today = isoDate(TODAY);
-    return CURRICULUM.flatMap(wk => wk.days.flatMap(day =>
-      day.tasks.filter(t => t.category === "Revision")
-        .flatMap(t => t.items.filter(i => !state.completedTasks[i.id]))
-    )).slice(0, 5);
-  }, [state]);
-
-  const catStats = [
-    { key:"DSA",      icon:Code2,    color:"blue",     pct:prog.DSA      },
-    { key:"HLD",      icon:Brain,    color:"purple",   pct:prog.HLD      },
-    { key:"LLD",      icon:Layers,   color:"orange",   pct:prog.LLD      },
-    { key:"Java",     icon:Coffee,   color:"cyan",     pct:prog.Java     },
-    { key:"Go",       icon:Zap,      color:"teal",     pct:prog.Go       },
-    { key:"Backend",  icon:Server,   color:"sky",      pct:prog.Backend  },
-    { key:"Behavioral",icon:Users,   color:"yellow",   pct:prog.Behavioral },
-    { key:"Revision", icon:RotateCcw,color:"green",    pct:prog.Revision },
-  ];
-
-  const colorMap = { blue:"bg-blue-500", purple:"bg-purple-500", orange:"bg-orange-500", cyan:"bg-cyan-500", teal:"bg-teal-500", sky:"bg-sky-500", yellow:"bg-yellow-500", green:"bg-green-500", emerald:"bg-emerald-500" };
-  const textColorMap = { blue:"text-blue-400", purple:"text-purple-400", orange:"text-orange-400", cyan:"text-cyan-400", teal:"text-teal-400", sky:"text-sky-400", yellow:"text-yellow-400", green:"text-green-400", emerald:"text-emerald-400" };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Interview Prep OS</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Senior Backend Engineer · Jun 17 – Aug 31, 2026 ·{" "}
-          <span className="text-slate-400">Google · Meta · Amazon · ByteDance · Grab · Uber · Stripe · Datadog · Cloudflare</span>
-        </p>
-      </div>
-
-      {/* Top metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 col-span-2 sm:col-span-1">
-          <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Overall</div>
-          <div className="text-3xl font-bold text-emerald-400">{prog.overall}%</div>
-          <div className="text-xs text-slate-600 mb-2">{prog.done}/{prog.total} tasks</div>
-          <ProgressBar value={prog.overall} colorClass="bg-emerald-500" />
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Streak</div>
-          <div className="flex items-end gap-1">
-            <div className="text-3xl font-bold text-orange-400">{streak}</div>
-            <div className="text-sm text-slate-500 mb-0.5">days</div>
-          </div>
-          <div className="text-xs text-slate-600 mt-1 flex items-center gap-1"><Flame size={10} className="text-orange-500"/>Consecutive days</div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Days Left</div>
-          <div className="flex items-end gap-1">
-            <div className="text-3xl font-bold text-blue-400">{daysLeft}</div>
-            <div className="text-sm text-slate-500 mb-0.5">days</div>
-          </div>
-          <div className="text-xs text-slate-600 mt-1 flex items-center gap-1"><CalendarDays size={10}/>Until Aug 31</div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center">
-          <ReadinessGauge score={readiness} />
-        </div>
-      </div>
-
-      {/* Category progress */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">Category Breakdown</h3>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-          {catStats.map(c => (
-            <div key={c.key}>
-              <div className="flex justify-between items-center mb-1">
-                <div className="flex items-center gap-1.5">
-                  <c.icon size={11} className={textColorMap[c.color]} />
-                  <span className="text-xs text-slate-400">{c.key}</span>
+      {/* Subject bars */}
+      <Card>
+        <p style={{fontSize:11,fontWeight:700,color:T.textDim,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:16}}>Subject Progress</p>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {subjects.map(s=>{
+            const p=subjPct(s.key,done);
+            return (
+              <div key={s.key}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                  <span style={{fontSize:13,fontWeight:700,color:s.textColor}}>{s.label}</span>
+                  <span style={{fontSize:13,color:T.textDim}}>{p}%</span>
                 </div>
-                <span className={`text-xs font-bold ${textColorMap[c.color]}`}>{c.pct}%</span>
+                <Bar pct={p} color={s.color}/>
               </div>
-              <ProgressBar value={c.pct} colorClass={colorMap[c.color]} size="sm" />
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </div>
+      </Card>
 
       {/* Week grid */}
-      <div>
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">Weeks</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {CURRICULUM.map(wk => {
-            const done2  = wk.days.reduce((s,d) => s + d.tasks.reduce((ss,t) => ss + t.items.filter(i => state.completedTasks[i.id]).length, 0), 0);
-            const total2 = wk.totalItems;
-            const pct2   = total2 ? Math.round(done2/total2*100) : 0;
-            const isCur  = wk.weekNum === curWeek;
+      <Card>
+        <p style={{fontSize:11,fontWeight:700,color:T.textDim,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:14}}>Jump to Week</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
+          {PLAN.map(w=>{
+            const p=wkPct(w,done);
+            const isCur=w.weekNum===cw;
             return (
-              <button
-                key={wk.weekNum}
-                onClick={() => onNavigate(`week${wk.weekNum}`)}
-                className={`bg-slate-900 border rounded-xl p-4 text-left hover:border-slate-600 transition-all group ${isCur ? "border-emerald-700/50 shadow-lg shadow-emerald-950/20" : "border-slate-800"}`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-bold ${isCur ? "text-emerald-400" : "text-slate-200"}`}>{wk.label}</span>
-                      {isCur && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-500 border border-emerald-700/40">NOW</span>}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{wk.range}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-lg font-bold ${pct2===100?"text-emerald-400":"text-slate-300"}`}>{pct2}%</div>
-                    <div className="text-xs text-slate-600">{done2}/{total2}</div>
-                  </div>
-                </div>
-                <ProgressBar value={pct2} colorClass={pct2===100?"bg-emerald-500":isCur?"bg-emerald-500":"bg-blue-600"} size="sm" />
-                <div className="mt-2 space-y-0.5">
-                  {wk.goals.slice(0,2).map((g,i) => (
-                    <div key={i} className="text-[10px] text-slate-600 truncate">{g}</div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-1 mt-2 text-xs text-slate-600 group-hover:text-slate-400 transition-colors">
-                  Open week <ArrowRight size={10} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Upcoming Mocks */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-          <Award size={13} className="text-pink-400"/>Mock Interview Schedule
-        </h3>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {MOCKS.map(m => {
-            const past = m.date < TODAY;
-            return (
-              <div key={m.date.toISOString()}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 border ${past ? "border-slate-800 opacity-50" : "border-pink-800/30 bg-pink-950/20"}`}>
-                <Trophy size={13} className={past ? "text-slate-600" : "text-pink-400"} />
-                <div>
-                  <div className={`text-xs font-medium ${past ? "text-slate-500" : "text-slate-200"}`}>{m.label}</div>
-                  <div className="text-xs text-slate-600">{m.date.toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
-                </div>
-                <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full border ${past ? "border-slate-700 text-slate-600" : m.type==="Full" ? "bg-pink-900/60 text-pink-300 border-pink-700/40" : "bg-purple-900/60 text-purple-300 border-purple-700/40"}`}>{m.type}</span>
+              <div key={w.weekNum} onClick={()=>onNav("week-detail",w.weekNum)}
+                style={{background:isCur?"rgba(99,102,241,0.18)":T.surface,border:`1px solid ${isCur?T.indigo:T.border}`,
+                  borderRadius:12,padding:"10px 6px",textAlign:"center",cursor:"pointer",transition:"all 0.15s"}}>
+                <p style={{fontSize:11,fontWeight:700,color:isCur?T.indigo:T.textDim}}>W{w.weekNum}</p>
+                <p style={{fontSize:18,fontWeight:800,color:T.text,margin:"3px 0"}}>{p}%</p>
+                {w.isMockWeek && <p style={{fontSize:10,color:T.amber}}>Mock</p>}
               </div>
             );
           })}
         </div>
-      </div>
-
-      {/* Revision due */}
-      {revDue.length > 0 && (
-        <div className="bg-green-950/20 border border-green-800/30 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-green-300 mb-3 flex items-center gap-2">
-            <RotateCcw size={13}/>Revision Due
-          </h3>
-          <div className="space-y-1">
-            {revDue.map(item => (
-              <div key={item.id} className="text-xs text-slate-400 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"/>
-                {item.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </Card>
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// STATISTICS PAGE
-// ════════════════════════════════════════════════════════════
+// ============================================================
+// WEEKLY LIST
+// ============================================================
+function WeeklyList({done, onSelect}) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <p style={{fontSize:11,fontWeight:700,color:T.textDim,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>10-Week Preparation Plan</p>
+      {PLAN.map(week=>{
+        const p=wkPct(week,done);
+        const total=week.days.reduce((s,d)=>s+cntTasks(d),0);
+        const dn=week.days.reduce((s,d)=>s+donInDay(d,done),0);
+        const sc=SUBJ[week.secondary.toLowerCase()]||SUBJ.lld;
+        const isCur=week.weekNum===curWeekNum();
+        return (
+          <div key={week.weekNum} onClick={()=>onSelect(week.weekNum)}
+            style={{background:isCur?"rgba(99,102,241,0.10)":T.card,
+              border:`1px solid ${isCur?T.indigo:T.border}`,borderRadius:16,padding:18,cursor:"pointer",transition:"all 0.15s"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                  <span style={{fontSize:15,fontWeight:700,color:T.text}}>Week {week.weekNum}</span>
+                  {isCur && <span style={{fontSize:11,background:"rgba(99,102,241,0.25)",color:"#a5b4fc",borderRadius:99,padding:"2px 8px"}}>Current</span>}
+                  {week.isMockWeek && <span style={{fontSize:11,background:"rgba(245,158,11,0.18)",color:T.amber,borderRadius:99,padding:"2px 8px"}}>Mock Week</span>}
+                  <Chip label={week.secondary} cfg={sc}/>
+                </div>
+                <p style={{fontSize:12,color:T.textDim}}>{fmtS(week.startDate)} – {fmtS(week.endDate)}</p>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <p style={{fontSize:24,fontWeight:800,color:T.text,margin:0}}>{p}%</p>
+                <p style={{fontSize:11,color:T.textDim}}>{dn}/{total} tasks</p>
+              </div>
+            </div>
+            <div style={{marginTop:12}}>
+              <Bar pct={p} color={sc.color} height={6}/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-function Statistics({ state }) {
-  const prog = useMemo(() => calcProgress(state), [state]);
-  const readiness = calcReadiness(prog);
-
-  const catRows = [
-    { key:"DSA",color:"blue",pct:prog.DSA },
-    { key:"HLD",color:"purple",pct:prog.HLD },
-    { key:"LLD",color:"orange",pct:prog.LLD },
-    { key:"Java",color:"cyan",pct:prog.Java },
-    { key:"Go",color:"teal",pct:prog.Go },
-    { key:"Backend",color:"sky",pct:prog.Backend },
-    { key:"Behavioral",color:"yellow",pct:prog.Behavioral },
-    { key:"Revision",color:"green",pct:prog.Revision },
-    { key:"Mock",color:"pink",pct:prog.Mock },
-  ];
-  const colorMap = { blue:"bg-blue-500",purple:"bg-purple-500",orange:"bg-orange-500",cyan:"bg-cyan-500",teal:"bg-teal-500",sky:"bg-sky-500",yellow:"bg-yellow-500",green:"bg-green-500",pink:"bg-pink-500",emerald:"bg-emerald-500" };
-  const textMap = { blue:"text-blue-400",purple:"text-purple-400",orange:"text-orange-400",cyan:"text-cyan-400",teal:"text-teal-400",sky:"text-sky-400",yellow:"text-yellow-400",green:"text-green-400",pink:"text-pink-400" };
-
-  const weekStats = CURRICULUM.map(wk => {
-    const d = wk.days.reduce((s,day) => s + day.tasks.reduce((ss,t) => ss + t.items.filter(i => state.completedTasks[i.id]).length, 0), 0);
-    const t = wk.totalItems;
-    return { wk: wk.weekNum, range: wk.range, done:d, total:t, pct: t ? Math.round(d/t*100) : 0 };
-  });
-
-  const strong = catRows.filter(c => c.pct >= 70).map(c => c.key);
-  const weak   = catRows.filter(c => c.pct < 30 && prog.totals[c.key]?.total > 0).map(c => c.key);
+// ============================================================
+// WEEK DETAIL
+// ============================================================
+function WeekDetail({weekNum, done, onToggle, notes, onNote, flags, onFlag}) {
+  const week = PLAN[weekNum-1];
+  const [di, setDi] = useState(0);
+  if (!week) return null;
+  const day = week.days[di];
+  const sec = day.sections.secondary.subject || week.secondary;
+  const sc = SUBJ[(sec||"lld").toLowerCase()]||SUBJ.lld;
+  const nk = `${weekNum}-${di}`;
+  const total = cntTasks(day);
+  const dn = donInDay(day,done);
+  const pct = total?Math.round(dn/total*100):0;
 
   return (
-    <div className="space-y-5">
-      <h2 className="text-xl font-bold text-slate-100">Statistics</h2>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Overall</div>
-          <div className="text-2xl font-bold text-emerald-400">{prog.overall}%</div>
-          <div className="text-xs text-slate-600">{prog.done}/{prog.total}</div>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <h2 style={{fontSize:20,fontWeight:800,color:T.text,margin:0}}>Week {week.weekNum}</h2>
+          <p style={{fontSize:12,color:T.textDim,margin:"3px 0 0"}}>{fmtS(week.startDate)} – {fmtS(week.endDate)}</p>
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Readiness</div>
-          <div className={`text-2xl font-bold ${readiness>=80?"text-emerald-400":readiness>=50?"text-yellow-400":"text-red-400"}`}>{readiness}%</div>
-          <div className="text-xs text-slate-600">Weighted score</div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Strong</div>
-          <div className="text-2xl font-bold text-emerald-400">{strong.length}</div>
-          <div className="text-xs text-slate-600">Topics ≥70%</div>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Needs Work</div>
-          <div className="text-2xl font-bold text-red-400">{weak.length}</div>
-          <div className="text-xs text-slate-600">Topics &lt;30%</div>
+        <div style={{textAlign:"right"}}>
+          <p style={{fontSize:26,fontWeight:800,color:T.text,margin:0}}>{wkPct(week,done)}%</p>
+          <p style={{fontSize:11,color:T.textDim}}>week</p>
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">Category Progress</h3>
-        <div className="space-y-3">
-          {catRows.map(c => (
-            <div key={c.key}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className={`font-medium ${textMap[c.color] || "text-slate-400"}`}>{c.key}</span>
-                <span className="text-slate-400">{c.pct}% · {prog.totals[c.key]?.done || 0}/{prog.totals[c.key]?.total || 0}</span>
-              </div>
-              <ProgressBar value={c.pct} colorClass={colorMap[c.color]} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">Weekly Completion</h3>
-        <div className="space-y-2">
-          {weekStats.map(w => (
-            <div key={w.wk}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-slate-400">Week {w.wk} <span className="text-slate-600">({w.range})</span></span>
-                <span className={w.pct===100?"text-emerald-400":"text-slate-400"}>{w.pct}% · {w.done}/{w.total}</span>
-              </div>
-              <ProgressBar value={w.pct} colorClass={w.pct===100?"bg-emerald-500":w.pct>60?"bg-blue-500":"bg-slate-700"} size="sm" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-emerald-400 mb-2 flex items-center gap-1"><CheckCheck size={13}/>Strong Areas</h3>
-          {strong.length ? strong.map(s => <div key={s} className="text-sm text-slate-300 py-0.5 flex items-center gap-2"><span className="text-emerald-500">✓</span>{s}</div>) : <div className="text-xs text-slate-600">Complete more tasks to identify strengths</div>}
-        </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-red-400 mb-2 flex items-center gap-1"><AlertCircle size={13}/>Needs Attention</h3>
-          {weak.length ? weak.map(s => <div key={s} className="text-sm text-slate-300 py-0.5 flex items-center gap-2"><span className="text-red-500">⚠</span>{s}</div>) : <div className="text-xs text-slate-600">No weak areas — keep going!</div>}
-        </div>
-      </div>
-
-      {/* Mock Scores */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2"><Trophy size={13} className="text-pink-400"/>Mock Interview Scores</h3>
-        {MOCKS.map(m => {
-          const key = `mock_${isoDate(m.date)}`;
-          const score = state.mockScores[key] || "";
-          const note  = state.notes[`${key}_note`] || "";
+      {/* Day strip */}
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:4}}>
+        {week.days.map((d,i)=>{
+          const sel=i===di;
+          const dt=cntTasks(d); const dd=donInDay(d,done);
+          const full=dt>0&&dd===dt;
+          const fl=flags[`${weekNum}-${i}`];
           return (
-            <div key={key} className="border-b border-slate-800 last:border-0 py-2">
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-300 font-medium">{m.label}</div>
-                <div className="text-xs text-slate-500">{m.date.toLocaleDateString("en-US",{month:"short",day:"numeric"})}</div>
-              </div>
-              {score && <div className="text-xs text-emerald-400 mt-0.5">Score: {score}</div>}
-              {note  && <div className="text-xs text-slate-500 mt-0.5">{note}</div>}
-              {!score && !note && <div className="text-xs text-slate-700 mt-0.5">Not yet completed</div>}
+            <div key={i} onClick={()=>setDi(i)}
+              style={{flexShrink:0,background:sel?"rgba(99,102,241,0.22)":T.card,
+                border:`1px solid ${sel?T.indigo:T.border}${d.isRevisionDay?"":""} `,
+                borderTop:`3px solid ${d.isRevisionDay?T.purple:d.isMockDay?T.amber:sel?T.indigo:"transparent"}`,
+                borderRadius:12,padding:"10px 12px",textAlign:"center",cursor:"pointer",minWidth:56}}>
+              <p style={{fontSize:11,color:sel?"#a5b4fc":T.textDim,fontWeight:600}}>{d.dayName.slice(0,3)}</p>
+              <p style={{fontSize:15,fontWeight:800,color:T.text,margin:"3px 0"}}>{d.date.getDate()}</p>
+              {full && <div style={{width:6,height:6,background:T.emerald,borderRadius:"50%",margin:"2px auto 0"}}/>}
+              {fl && <div style={{width:6,height:6,background:T.rose,borderRadius:"50%",margin:"2px auto 0"}}/>}
+              {d.isRevisionDay && <p style={{fontSize:9,color:T.purple,marginTop:2}}>Rev</p>}
+              {d.isMockDay && <p style={{fontSize:9,color:T.amber,marginTop:2}}>Mock</p>}
             </div>
           );
         })}
       </div>
 
-      {/* DSA Pattern Coverage */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-1 flex items-center gap-2"><Code2 size={13} className="text-blue-400"/>NeetCode 150 — All DSA Patterns</h3>
-        <div className="text-xs text-slate-600 mb-3">14 patterns covering the full NeetCode 150 curriculum</div>
-        <div className="space-y-1">
-          {Object.entries(DSA).map(([key, pat]) => (
-            <div key={key} className="flex items-center gap-2 py-1 border-b border-slate-800/60 last:border-0">
-              <span className="text-xs text-blue-400 font-mono w-5 flex-shrink-0">{key}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-slate-300 font-medium truncate">{pat.pattern}</div>
-                <div className="text-[10px] text-slate-600">{pat.mustSolve.length} must-solve · {pat.optional.length} optional</div>
-              </div>
-              <span className="text-[10px] text-slate-700 flex-shrink-0">{pat.mustSolve.length + pat.optional.length} problems</span>
-            </div>
-          ))}
+      {/* Day header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <h3 style={{fontSize:16,fontWeight:700,color:T.text,margin:0}}>{day.dayName}, {day.dateStr}</h3>
+          <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+            {day.isRevisionDay && <span style={{fontSize:11,background:"rgba(168,85,247,0.18)",color:T.purple,borderRadius:99,padding:"2px 8px"}}>Revision Day</span>}
+            {day.isMockDay    && <span style={{fontSize:11,background:"rgba(245,158,11,0.18)",color:T.amber,borderRadius:99,padding:"2px 8px"}}>Mock Interview Day</span>}
+            {day.isWeekend&&!day.isRevisionDay&&!day.isMockDay && <span style={{fontSize:11,background:T.surface,color:T.textDim,borderRadius:99,padding:"2px 8px"}}>Weekend – Extended Session</span>}
+          </div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <span style={{fontSize:22,fontWeight:800,color:T.text}}>{pct}%</span>
+          <p style={{fontSize:11,color:T.textDim,margin:0}}>{dn}/{total}</p>
         </div>
       </div>
-    </div>
-  );
-}
 
-// ════════════════════════════════════════════════════════════
-// SETTINGS PAGE
-// ════════════════════════════════════════════════════════════
-
-function SettingsPage({ state, onReset, onImport, setState }) {
-  const [confirm, setConfirm] = useState(false);
-
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `ipt-os-backup-${isoDate(TODAY)}.json`;
-    a.click();
-  };
-
-  const handleImport = e => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try { onImport(JSON.parse(ev.target.result)); alert("Progress restored!"); }
-      catch { alert("Invalid backup file."); }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  };
-
-  const mockDateStr = isoDate(MOCKS[0].date);
-  const [mockInput, setMockInput] = useState("");
-  const [mockNote, setMockNote] = useState("");
-  const [activeMock, setActiveMock] = useState(0);
-
-  const saveScore = () => {
-    const key = `mock_${isoDate(MOCKS[activeMock].date)}`;
-    setState(prev => ({
-      ...prev,
-      mockScores: { ...prev.mockScores, [key]: mockInput },
-      notes: { ...prev.notes, [`${key}_note`]: mockNote },
-    }));
-    setMockInput(""); setMockNote("");
-  };
-
-  return (
-    <div className="space-y-5">
-      <h2 className="text-xl font-bold text-slate-100">Settings</h2>
-
-      {/* Mock Score Entry */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2"><Trophy size={13} className="text-pink-400"/>Log Mock Scores</h3>
-        <div className="flex gap-2 mb-3 flex-wrap">
-          {MOCKS.map((m,i) => (
-            <button key={i} onClick={()=>setActiveMock(i)}
-              className={`text-xs px-2 py-1 rounded-lg border transition-colors ${activeMock===i?"border-pink-600 text-pink-300 bg-pink-950/30":"border-slate-700 text-slate-500 hover:border-slate-600"}`}>
-              Mock {i+1}
-            </button>
-          ))}
+      {/* DSA Section */}
+      <div style={{background:"rgba(99,102,241,0.07)",border:`1px solid rgba(99,102,241,0.25)`,borderRadius:16,padding:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <Chip label="DSA" cfg={SUBJ.dsa}/>
+          <span style={{fontSize:13,fontWeight:600,color:T.text}}>{day.sections.dsa.topic}</span>
         </div>
-        <div className="text-xs text-slate-400 mb-2">{MOCKS[activeMock].label} — {MOCKS[activeMock].date.toLocaleDateString()}</div>
-        <input
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500 mb-2"
-          placeholder="Score or rating (e.g. 7/10, Passed, Strong Hire)"
-          value={mockInput}
-          onChange={e => setMockInput(e.target.value)}
-        />
+        {day.sections.dsa.tasks.map(t=>(
+          <CheckItem key={t.id} task={t} done={!!done[t.id]} onToggle={()=>onToggle(t.id)}/>
+        ))}
+      </div>
+
+      {/* Secondary Section */}
+      <div style={{background:sc.bg,border:`1px solid ${sc.color}33`,borderRadius:16,padding:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <Chip label={sec} cfg={sc}/>
+          <span style={{fontSize:13,fontWeight:600,color:T.text}}>{day.sections.secondary.topic}</span>
+        </div>
+        {day.sections.secondary.tasks.map(t=>(
+          <CheckItem key={t.id} task={t} done={!!done[t.id]} onToggle={()=>onToggle(t.id)}/>
+        ))}
+      </div>
+
+      {/* Notes */}
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:18}}>
+        <p style={{fontSize:12,fontWeight:600,color:T.textDim,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+          ✏️ Things to revise later
+        </p>
         <textarea
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-slate-500 font-mono mb-2"
-          rows={2}
-          placeholder="Weak areas, notes, areas for improvement..."
-          value={mockNote}
-          onChange={e => setMockNote(e.target.value)}
+          value={notes[nk]||""}
+          onChange={e=>onNote(nk,e.target.value)}
+          placeholder="Jot down concepts to revisit, problems that confused you, links..."
+          style={{
+            width:"100%",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:10,
+            padding:12,fontSize:13,color:T.text,resize:"vertical",minHeight:100,outline:"none",
+            fontFamily:"inherit",lineHeight:1.6,boxSizing:"border-box",
+            caretColor:T.indigo
+          }}
         />
-        <button onClick={saveScore} className="text-sm px-4 py-1.5 bg-pink-900/40 text-pink-300 border border-pink-700/40 rounded-lg hover:bg-pink-900/60 transition-colors">Save Score</button>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl divide-y divide-slate-800">
-        <div className="p-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-medium text-slate-200">Export Progress</div>
-            <div className="text-xs text-slate-500">Download complete JSON backup</div>
-          </div>
-          <button onClick={handleExport} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm rounded-lg transition-colors flex-shrink-0">
-            <Download size={13}/>Export
-          </button>
+      {/* Flag */}
+      <div onClick={()=>onFlag(nk)}
+        style={{background:flags[nk]?"rgba(244,63,94,0.08)":T.card,
+          border:`1px solid ${flags[nk]?"rgba(244,63,94,0.35)":T.border}`,
+          borderRadius:16,padding:16,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
+        <div style={{
+          width:20,height:20,borderRadius:5,flexShrink:0,
+          background:flags[nk]?T.rose:"transparent",
+          border:`2px solid ${flags[nk]?T.rose:"#3a3a5a"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"
+        }}>
+          {flags[nk] && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
         </div>
-        <div className="p-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-medium text-slate-200">Import Progress</div>
-            <div className="text-xs text-slate-500">Restore from backup file</div>
-          </div>
-          <label className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm rounded-lg transition-colors cursor-pointer flex-shrink-0">
-            <Upload size={13}/>Import
-            <input type="file" accept=".json" className="hidden" onChange={handleImport}/>
-          </label>
-        </div>
-        <div className="p-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-medium text-red-400">Reset All Progress</div>
-            <div className="text-xs text-slate-500">Clears all checkboxes, notes & scores</div>
-          </div>
-          {confirm ? (
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={()=>{ onReset(); setConfirm(false); }} className="text-xs px-3 py-1.5 bg-red-900/60 text-red-300 border border-red-700 rounded-lg hover:bg-red-900 transition-colors">Confirm Reset</button>
-              <button onClick={()=>setConfirm(false)} className="text-xs px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-colors">Cancel</button>
-            </div>
-          ) : (
-            <button onClick={()=>setConfirm(true)} className="flex items-center gap-2 px-3 py-1.5 bg-red-950/40 text-red-400 border border-red-800/50 rounded-lg hover:bg-red-950/60 text-sm transition-colors flex-shrink-0">
-              <Trash2 size={13}/>Reset
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs text-slate-600 space-y-1">
-        <div className="text-slate-400 font-medium mb-2">About</div>
-        <div>Interview Preparation OS — Senior Backend Engineer Track</div>
-        <div>Timeline: June 17 – August 31, 2026 · 11 Weeks · 77 Days</div>
-        <div>Targets: Google · Meta · Amazon · ByteDance · TikTok · Shopee · Grab · Uber · Stripe · Datadog · Cloudflare</div>
-        {state.lastUpdated && <div className="pt-1">Last saved: {new Date(state.lastUpdated).toLocaleString()}</div>}
+        <span style={{fontSize:13,fontWeight:600,color:flags[nk]?"#fda4af":T.textDim}}>🚩 Need revision — mark this day for follow-up</span>
       </div>
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════
-// SIDEBAR
-// ════════════════════════════════════════════════════════════
+// ============================================================
+// REVISION
+// ============================================================
+function Revision({done, flags, notes}) {
+  const flagged = [];
+  PLAN.forEach(week=>week.days.forEach((day,di)=>{
+    const k=`${week.weekNum}-${di}`;
+    if(flags[k]) flagged.push({week,day,di,k});
+  }));
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <h2 style={{fontSize:20,fontWeight:800,color:T.text,margin:0}}>Revision Tracker</h2>
+        <span style={{fontSize:12,background:"rgba(244,63,94,0.18)",color:T.rose,borderRadius:99,padding:"3px 10px"}}>{flagged.length} flagged</span>
+      </div>
+      {flagged.length===0 ? (
+        <Card style={{textAlign:"center",padding:60}}>
+          <p style={{fontSize:32,marginBottom:8}}>🎯</p>
+          <p style={{color:T.textDim,fontSize:13,lineHeight:1.6}}>No days flagged yet.<br/>Check "Need revision" on any day to track it here.</p>
+        </Card>
+      ) : flagged.map(({week,day,di,k})=>{
+        const dt=cntTasks(day); const dn=donInDay(day,done);
+        const sc=SUBJ[(day.sections.secondary.subject||"lld").toLowerCase()]||SUBJ.lld;
+        return (
+          <div key={k} style={{background:"rgba(244,63,94,0.05)",border:"1px solid rgba(244,63,94,0.2)",borderRadius:16,padding:18}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div>
+                <p style={{fontWeight:700,color:T.text,margin:0}}>{day.dayName}, {day.dateStr}</p>
+                <p style={{fontSize:12,color:T.textDim,margin:"3px 0 0"}}>Week {week.weekNum} · Day {di+1}</p>
+              </div>
+              <span style={{fontSize:11,background:"rgba(244,63,94,0.18)",color:T.rose,borderRadius:99,padding:"2px 8px"}}>🚩 Flagged</span>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+              <Chip label="DSA" cfg={SUBJ.dsa}/>
+              <span style={{fontSize:12,color:T.textDim}}>{day.sections.dsa.topic}</span>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+              <Chip label={day.sections.secondary.subject||"LLD"} cfg={sc}/>
+              <span style={{fontSize:12,color:T.textDim}}>{day.sections.secondary.topic}</span>
+            </div>
+            {notes[k] && (
+              <div style={{background:"rgba(255,255,255,0.04)",borderRadius:10,padding:12,marginBottom:10}}>
+                <p style={{fontSize:11,color:T.textDim,marginBottom:4}}>Notes:</p>
+                <p style={{fontSize:13,color:"#b0b0d0",whiteSpace:"pre-wrap",margin:0}}>{notes[k]}</p>
+              </div>
+            )}
+            <Bar pct={dt?Math.round(dn/dt*100):0} color={T.rose} height={5}/>
+            <p style={{fontSize:11,color:T.textDim,marginTop:5}}>{dn}/{dt} tasks done</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-function Sidebar({ active, onNavigate, state, open, onClose }) {
-  const curWeek = getCurrentWeek();
-  const prog = useMemo(() => calcProgress(state), [state]);
+// ============================================================
+// APP
+// ============================================================
+export default function App() {
+  const [done,  setDone]  = useState(()=>load(LS.tasks,{}));
+  const [notes, setNotes] = useState(()=>load(LS.notes,{}));
+  const [flags, setFlags] = useState(()=>load(LS.flags,{}));
+  const [page,  setPage]  = useState("overview");
+  const [selW,  setSelW]  = useState(curWeekNum);
 
-  const navItems = [
-    { id:"dashboard", label:"Dashboard", icon:LayoutDashboard },
-    ...CURRICULUM.map(wk => ({ id:`week${wk.weekNum}`, label:`Week ${wk.weekNum}`, sub:wk.range, icon:CalendarDays, weekNum:wk.weekNum })),
-    { id:"statistics", label:"Statistics", icon:BarChart3 },
-    { id:"settings",   label:"Settings",   icon:Settings   },
+  useEffect(()=>save(LS.tasks,done),  [done]);
+  useEffect(()=>save(LS.notes,notes), [notes]);
+  useEffect(()=>save(LS.flags,flags), [flags]);
+
+  const toggle = useCallback(id=>setDone(p=>({...p,[id]:!p[id]})),[]);
+  const note   = useCallback((k,v)=>setNotes(p=>({...p,[k]:v})),[]);
+  const flag   = useCallback(k=>setFlags(p=>({...p,[k]:!p[k]})),[]);
+
+  const nav = useCallback((target,w)=>{ if(w) setSelW(w); setPage(target); },[]);
+
+  const NAV=[
+    {id:"overview",    icon:"📊",label:"Overview"},
+    {id:"weekly",      icon:"📅",label:"Weeks"},
+    {id:"week-detail", icon:"📋",label:`W${selW}`},
+    {id:"revision",    icon:"🚩",label:"Revision"},
   ];
 
-  return (
-    <>
-      {open && <div className="fixed inset-0 bg-black/70 z-30 lg:hidden" onClick={onClose}/>}
-      <aside className={`
-        fixed top-0 left-0 h-full w-56 bg-slate-950 border-r border-slate-800/60 z-40 flex flex-col
-        transition-transform duration-200 ease-out
-        ${open ? "translate-x-0" : "-translate-x-full"}
-        lg:translate-x-0 lg:static lg:h-screen
-      `}>
-        <div className="p-4 border-b border-slate-800/60 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-bold text-slate-100 tracking-tight">IPT OS</div>
-            <div className="text-[10px] text-slate-600">Jun 17 – Aug 31</div>
-          </div>
-          <button onClick={onClose} className="lg:hidden text-slate-600 hover:text-slate-400 p-1"><X size={14}/></button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = active === item.id;
-            const isCurWk  = item.weekNum === curWeek;
-            let wkPct = null;
-            if (item.weekNum) {
-              const wk = CURRICULUM[item.weekNum - 1];
-              const d = wk.days.reduce((s,day) => s + day.tasks.reduce((ss,t) => ss + t.items.filter(i => state.completedTasks[i.id]).length, 0), 0);
-              wkPct = wk.totalItems ? Math.round(d / wk.totalItems * 100) : 0;
-            }
-            return (
-              <button
-                key={item.id}
-                onClick={() => { onNavigate(item.id); onClose(); }}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                  isActive
-                    ? "bg-slate-800 text-slate-100"
-                    : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"
-                }`}
-              >
-                <Icon size={13} className={isActive ? "text-emerald-400" : isCurWk ? "text-emerald-600" : "text-slate-700"} />
-                <div className="flex-1 min-w-0">
-                  <div className={`text-xs font-medium truncate ${isCurWk && !isActive ? "text-emerald-500" : ""}`}>
-                    {item.label}{isCurWk ? " ★" : ""}
-                  </div>
-                  {item.sub && <div className="text-[10px] text-slate-700 truncate">{item.sub}</div>}
-                </div>
-                {wkPct !== null && (
-                  <span className={`text-[10px] flex-shrink-0 ${wkPct===100?"text-emerald-500":"text-slate-700"}`}>{wkPct}%</span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-slate-800/60">
-          <div className="text-[10px] text-slate-600 mb-1.5">Overall</div>
-          <ProgressBar value={prog.overall} colorClass="bg-emerald-500" size="sm" />
-          <div className="flex justify-between mt-1">
-            <span className="text-[10px] text-emerald-500">{prog.overall}%</span>
-            <span className="text-[10px] text-slate-700">{daysRemaining()}d left</span>
-          </div>
-        </div>
-      </aside>
-    </>
-  );
-}
-
-// ════════════════════════════════════════════════════════════
-// APP ROOT
-// ════════════════════════════════════════════════════════════
-
-export default function App() {
-  const { state, toggleTask, setNote, setMockScore, resetAll, setState } = useLocalStorage();
-  const [page, setPage]   = useState("dashboard");
-  const [sideOpen, setSideOpen] = useState(false);
-
-  const weekNum = page.startsWith("week") ? parseInt(page.replace("week","")) : null;
-
-  const pageTitle = page === "dashboard" ? "Dashboard"
-    : page === "statistics" ? "Statistics"
-    : page === "settings"   ? "Settings"
-    : weekNum ? `Week ${weekNum}`
-    : "Dashboard";
+  const overall = totalPct(done);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
-      <Sidebar active={page} onNavigate={setPage} state={state} open={sideOpen} onClose={() => setSideOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile topbar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-slate-800/60 bg-slate-950/90 backdrop-blur sticky top-0 z-20 flex-shrink-0">
-          <button onClick={() => setSideOpen(true)} className="text-slate-500 hover:text-slate-300">
-            <Menu size={18}/>
-          </button>
-          <span className="text-sm font-semibold text-slate-200">{pageTitle}</span>
-        </header>
-        {/* Main scroll */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-4 py-6 lg:py-8">
-            {page === "dashboard"  && <Dashboard state={state} onNavigate={setPage} />}
-            {page === "statistics" && <Statistics state={state} />}
-            {page === "settings"   && <SettingsPage state={state} onReset={resetAll} onImport={s => setState(() => s)} setState={setState} />}
-            {weekNum               && <WeekPage weekNum={weekNum} state={state} onToggle={toggleTask} onNote={setNote} />}
+    <div style={{minHeight:"100vh",background:T.bg,color:T.text,fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"}}>
+      {/* Header */}
+      <div style={{position:"sticky",top:0,zIndex:50,background:"rgba(13,13,20,0.9)",backdropFilter:"blur(16px)",
+        borderBottom:`1px solid ${T.border}`,padding:"12px 16px"}}>
+        <div style={{maxWidth:640,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:34,height:34,borderRadius:10,background:"rgba(99,102,241,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🎯</div>
+            <div>
+              <p style={{fontSize:13,fontWeight:700,color:T.text,margin:0,lineHeight:1.2}}>Interview Tracker</p>
+              <p style={{fontSize:11,color:T.textDim,margin:0,lineHeight:1.2}}>Senior Backend · {overall}% complete</p>
+            </div>
           </div>
-        </main>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <div style={{position:"sticky",top:57,zIndex:40,background:"rgba(13,13,20,0.85)",backdropFilter:"blur(12px)",
+        borderBottom:`1px solid ${T.border}`,padding:"6px 16px"}}>
+        <div style={{maxWidth:640,margin:"0 auto",display:"flex",gap:4}}>
+          {NAV.map(n=>(
+            <button key={n.id} onClick={()=>nav(n.id)}
+              style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px 4px",
+                borderRadius:10,border:"none",cursor:"pointer",transition:"all 0.15s",
+                background:page===n.id?"rgba(99,102,241,0.18)":"transparent",
+                color:page===n.id?"#a5b4fc":T.textDim,fontSize:11,fontWeight:600}}>
+              <span style={{fontSize:16}}>{n.icon}</span>
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{maxWidth:640,margin:"0 auto",padding:"20px 16px 48px"}}>
+        {page==="overview"    && <Overview done={done} onNav={nav}/>}
+        {page==="weekly"      && <WeeklyList done={done} onSelect={w=>nav("week-detail",w)}/>}
+        {page==="week-detail" && <WeekDetail weekNum={selW} done={done} onToggle={toggle} notes={notes} onNote={note} flags={flags} onFlag={flag}/>}
+        {page==="revision"    && <Revision done={done} flags={flags} notes={notes}/>}
       </div>
     </div>
   );
